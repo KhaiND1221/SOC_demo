@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Register - SOC Logging Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <a href="/index.html">Home</a>
+    <a href="/register.html">Register</a>
+    <a href="/login.html">Login</a>
+    <a href="/profile.html">Profile</a>
+    <a href="/orders.html">Orders</a>
+  </nav>
+
+  <h1>Register</h1>
+
+  <div class="card">
+    <label for="username">Username</label>
+    <input id="username" type="text" autocomplete="username" />
+
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" />
+
+    <label for="password">Password (min 8 chars)</label>
+    <input id="password" type="password" autocomplete="new-password" />
+
+    <button id="register-btn">Register</button>
+    <p id="msg" class="message"></p>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    document.getElementById("register-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("msg");
+      const username = document.getElementById("username").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      const res = await apiFetch("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ username, email, password }),
+      });
+
+      if (res.ok) {
+        showMessage(msgEl, `Registered user '${res.data.username}'. You can now log in.`);
+      } else {
+        showMessage(msgEl, `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, true);
+      }
+    });
+  </script>
+</body>
+</html>

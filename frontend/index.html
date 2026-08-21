@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SOC Logging Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <a href="/index.html">Home</a>
+    <a href="/register.html">Register</a>
+    <a href="/login.html">Login</a>
+    <a href="/profile.html">Profile</a>
+    <a href="/orders.html">Orders</a>
+  </nav>
+
+  <h1>SOC Logging Lab</h1>
+  <p class="muted" id="user-badge"></p>
+
+  <div class="card">
+    <p>Minimal web app with full logging across Nginx, FastAPI (app + auth loggers), and PostgreSQL, built for SOC Tier 3 log-correlation training. See the project README.md and LOGGING_MAP.md for the endpoint-to-log mapping and the 10 walkthrough scenarios.</p>
+  </div>
+
+  <h2>Session</h2>
+  <div class="card">
+    <button id="logout-btn">Logout</button>
+    <p id="logout-msg" class="message"></p>
+  </div>
+
+  <h2>Scenario: application exception (500)</h2>
+  <div class="card">
+    <p class="muted">Calls GET /api/debug/crash. The response only shows a generic message + request_id; the full stack trace is written server-side only (app.log, event="unhandled_exception"). Use the request_id below to grep the log.</p>
+    <button id="crash-btn">Trigger crash</button>
+    <pre id="crash-out"></pre>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    renderUserBadge("user-badge");
+
+    document.getElementById("logout-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("logout-msg");
+      const res = await apiFetch("/auth/logout", { method: "POST" });
+      clearStoredUser();
+      renderUserBadge("user-badge");
+      showMessage(msgEl, res.status === 204 ? "Logged out." : "No active session.", res.status !== 204);
+    });
+
+    document.getElementById("crash-btn").addEventListener("click", async () => {
+      const out = document.getElementById("crash-out");
+      const res = await apiFetch("/debug/crash");
+      out.textContent = `HTTP ${res.status}\n` + JSON.stringify(res.data, null, 2);
+    });
+  </script>
+</body>
+</html>

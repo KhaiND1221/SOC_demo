@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Login - SOC Logging Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <a href="/index.html">Home</a>
+    <a href="/register.html">Register</a>
+    <a href="/login.html">Login</a>
+    <a href="/profile.html">Profile</a>
+    <a href="/orders.html">Orders</a>
+  </nav>
+
+  <h1>Login</h1>
+  <p class="muted">Session-based auth. After login a session_id cookie is set (HttpOnly). 5 failed attempts within 5 minutes (same IP or username) triggers a temporary lockout — see auth.log.</p>
+
+  <div class="card">
+    <label for="username">Username</label>
+    <input id="username" type="text" autocomplete="username" />
+
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+
+    <button id="login-btn">Login</button>
+    <p id="msg" class="message"></p>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    document.getElementById("login-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("msg");
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      const res = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (res.ok) {
+        setStoredUser(res.data);
+        showMessage(msgEl, `Logged in as ${res.data.username}. Redirecting...`);
+        setTimeout(() => { window.location.href = "/index.html"; }, 500);
+      } else {
+        showMessage(msgEl, `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, true);
+      }
+    });
+  </script>
+</body>
+</html>

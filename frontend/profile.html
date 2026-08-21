@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Profile - SOC Logging Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <a href="/index.html">Home</a>
+    <a href="/register.html">Register</a>
+    <a href="/login.html">Login</a>
+    <a href="/profile.html">Profile</a>
+    <a href="/orders.html">Orders</a>
+  </nav>
+
+  <h1>Profile</h1>
+  <p class="muted" id="user-badge"></p>
+
+  <div class="card">
+    <label for="user-id">User ID to load (defaults to your own; try a different user's id to test IDOR -> expect 403)</label>
+    <input id="user-id" type="text" />
+    <button id="load-btn">Load profile</button>
+    <p id="load-msg" class="message"></p>
+    <pre id="profile-out"></pre>
+  </div>
+
+  <h2>Update (only works on your own profile)</h2>
+  <div class="card">
+    <label for="email">New email (leave blank to keep unchanged)</label>
+    <input id="email" type="email" />
+
+    <label for="password">New password (leave blank to keep unchanged)</label>
+    <input id="password" type="password" />
+
+    <button id="save-btn">Save changes</button>
+    <p id="save-msg" class="message"></p>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    renderUserBadge("user-badge");
+    const stored = getStoredUser();
+    if (stored) document.getElementById("user-id").value = stored.id;
+
+    document.getElementById("load-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("load-msg");
+      const out = document.getElementById("profile-out");
+      const id = document.getElementById("user-id").value.trim();
+
+      const res = await apiFetch(`/users/${id}`);
+      out.textContent = `HTTP ${res.status}\n` + JSON.stringify(res.data, null, 2);
+      showMessage(msgEl, res.ok ? "Loaded." : `Error ${res.status}`, !res.ok);
+    });
+
+    document.getElementById("save-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("save-msg");
+      const id = document.getElementById("user-id").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      const body = {};
+      if (email) body.email = email;
+      if (password) body.password = password;
+
+      const res = await apiFetch(`/users/${id}`, { method: "PUT", body: JSON.stringify(body) });
+      showMessage(msgEl, res.ok ? "Profile updated." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
+    });
+  </script>
+</body>
+</html>

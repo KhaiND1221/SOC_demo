@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Orders - SOC Logging Lab</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <a href="/index.html">Home</a>
+    <a href="/register.html">Register</a>
+    <a href="/login.html">Login</a>
+    <a href="/profile.html">Profile</a>
+    <a href="/orders.html">Orders</a>
+  </nav>
+
+  <h1>Orders</h1>
+  <p class="muted" id="user-badge"></p>
+
+  <h2>My orders</h2>
+  <div class="card">
+    <button id="refresh-btn">Refresh list</button>
+    <table id="orders-table">
+      <thead>
+        <tr><th>Product</th><th>Qty</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="orders-body"></tbody>
+    </table>
+    <p id="list-msg" class="message"></p>
+  </div>
+
+  <h2>Create order</h2>
+  <div class="card">
+    <label for="c-product">Product name</label>
+    <input id="c-product" type="text" />
+    <label for="c-qty">Quantity</label>
+    <input id="c-qty" type="number" value="1" min="1" />
+    <label for="c-price">Unit price</label>
+    <input id="c-price" type="number" value="10.00" step="0.01" min="0" />
+    <label for="c-status">Status</label>
+    <select id="c-status">
+      <option value="pending">pending</option>
+      <option value="paid">paid</option>
+      <option value="shipped">shipped</option>
+      <option value="cancelled">cancelled</option>
+    </select>
+    <button id="create-btn">Create</button>
+    <p id="create-msg" class="message"></p>
+  </div>
+
+  <h2>Lookup / edit by order ID (try another user's order id to test IDOR -> expect 403)</h2>
+  <div class="card">
+    <label for="lookup-id">Order ID</label>
+    <input id="lookup-id" type="text" />
+    <button id="get-btn" class="secondary">GET</button>
+    <button id="delete-btn" class="danger">DELETE</button>
+    <pre id="lookup-out"></pre>
+
+    <label for="u-status">New status (PUT update)</label>
+    <select id="u-status">
+      <option value="">-- no change --</option>
+      <option value="pending">pending</option>
+      <option value="paid">paid</option>
+      <option value="shipped">shipped</option>
+      <option value="cancelled">cancelled</option>
+    </select>
+    <button id="update-btn">PUT update status</button>
+    <p id="lookup-msg" class="message"></p>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    renderUserBadge("user-badge");
+
+    async function loadOrders() {
+      const msgEl = document.getElementById("list-msg");
+      const body = document.getElementById("orders-body");
+      const res = await apiFetch("/orders");
+
+      if (!res.ok) {
+        showMessage(msgEl, `Error ${res.status}`, true);
+        return;
+      }
+
+      body.innerHTML = "";
+      res.data.forEach((o) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${o.product_name}</td>
+          <td>${o.quantity}</td>
+          <td>${o.unit_price}</td>
+          <td>${o.status}</td>
+          <td class="row-actions">
+            <button class="secondary" data-id="${o.id}" data-action="view">View</button>
+            <button class="danger" data-id="${o.id}" data-action="delete">Delete</button>
+          </td>`;
+        body.appendChild(tr);
+      });
+      showMessage(msgEl, `Loaded ${res.data.length} order(s).`);
+    }
+
+    document.getElementById("refresh-btn").addEventListener("click", loadOrders);
+
+    document.getElementById("orders-body").addEventListener("click", async (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const id = btn.dataset.id;
+
+      if (btn.dataset.action === "view") {
+        document.getElementById("lookup-id").value = id;
+        document.getElementById("get-btn").click();
+      } else if (btn.dataset.action === "delete") {
+        await apiFetch(`/orders/${id}`, { method: "DELETE" });
+        loadOrders();
+      }
+    });
+
+    document.getElementById("create-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("create-msg");
+      const res = await apiFetch("/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          product_name: document.getElementById("c-product").value.trim(),
+          quantity: parseInt(document.getElementById("c-qty").value, 10),
+          unit_price: parseFloat(document.getElementById("c-price").value),
+          status: document.getElementById("c-status").value,
+        }),
+      });
+      showMessage(msgEl, res.ok ? "Order created." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
+      if (res.ok) loadOrders();
+    });
+
+    document.getElementById("get-btn").addEventListener("click", async () => {
+      const out = document.getElementById("lookup-out");
+      const id = document.getElementById("lookup-id").value.trim();
+      const res = await apiFetch(`/orders/${id}`);
+      out.textContent = `HTTP ${res.status}\n` + JSON.stringify(res.data, null, 2);
+    });
+
+    document.getElementById("delete-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("lookup-msg");
+      const id = document.getElementById("lookup-id").value.trim();
+      const res = await apiFetch(`/orders/${id}`, { method: "DELETE" });
+      showMessage(msgEl, res.status === 204 ? "Deleted." : `Error ${res.status}`, res.status !== 204);
+      loadOrders();
+    });
+
+    document.getElementById("update-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("lookup-msg");
+      const id = document.getElementById("lookup-id").value.trim();
+      const status = document.getElementById("u-status").value;
+      if (!status) { showMessage(msgEl, "Pick a status first.", true); return; }
+
+      const res = await apiFetch(`/orders/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
+      showMessage(msgEl, res.ok ? "Order updated." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
+      if (res.ok) loadOrders();
+    });
+
+    loadOrders();
+  </script>
+</body>
+</html>
