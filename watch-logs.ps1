@@ -80,9 +80,23 @@ function Format-NginxLog {
 
 function Format-DbLog {
     param([string]$Line)
-    if ($Line -match "INSERT|UPDATE|DELETE") {
-        Write-Host $Line -ForegroundColor Yellow
+
+    # Postgres logs the full SQL statement (can wrap many terminal lines
+    # with all its VALUES(...)). For the demo view, show just the verb +
+    # table - the same compact single-line shape as the Nginx rows above.
+    if ($Line -match 'statement:\s+(?<verb>INSERT|UPDATE|DELETE)\s+(?:INTO\s+|FROM\s+)?(?<table>\w+)') {
+        $verb = $Matches['verb']
+        $table = $Matches['table']
+        $verbColor = switch ($verb) {
+            "INSERT" { "Green" }
+            "UPDATE" { "Cyan" }
+            "DELETE" { "Red" }
+            default  { "Yellow" }
+        }
+        Write-Host -NoNewline ("{0,-8} " -f $verb) -ForegroundColor $verbColor
+        Write-Host ("{0,-20}" -f $table) -ForegroundColor Gray
     } else {
+        # Non-DML lines (connection/checkpoint/startup messages, etc.)
         Write-Host $Line -ForegroundColor DarkGray
     }
 }
