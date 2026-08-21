@@ -50,7 +50,7 @@ function Format-JsonLog {
         "WARNING" { "Yellow" }
         default   { "Green" }
     }
-    $ts = try { ([datetime]$o.timestamp).ToString("HH:mm:ss") } catch { "--:--:--" }
+    $ts = try { ([datetimeoffset]$o.timestamp).UtcDateTime.ToString("HH:mm:ss") } catch { "--:--:--" }
     $uid = if ($o.user_id) { $o.user_id.ToString().Substring(0, [Math]::Min(8, $o.user_id.ToString().Length)) } else { "-" }
 
     Write-Host -NoNewline "$ts " -ForegroundColor DarkGray
@@ -97,6 +97,33 @@ function Write-LogLine {
     }
 }
 
+# Extracts a sortable timestamp from a raw log line so lines from all 4
+# sources can be merged into ONE true chronological timeline instead of
+# being grouped by source (which is confusing to read/demo).
+function Get-LineTimestamp {
+    param([string]$Line, [string]$Kind)
+    try {
+        switch ($Kind) {
+            # Cast via [datetimeoffset] then take .UtcDateTime: JSON timestamps
+            # carry an explicit +00:00 offset, and a plain [datetime] cast would
+            # silently convert them to the machine's LOCAL timezone (e.g. +7),
+            # which would desync them from the DB source's raw UTC-only text
+            # timestamps and break the merge-sort below.
+            "json"  { return ([datetimeoffset]($Line | ConvertFrom-Json).timestamp).UtcDateTime }
+            "nginx" { return ([datetimeoffset]($Line | ConvertFrom-Json).time).UtcDateTime }
+            "text"  {
+                if ($Line -match '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ UTC') {
+                    return [datetime]::ParseExact($Matches[0], "yyyy-MM-dd HH:mm:ss.fff 'UTC'", $null)
+                }
+                return [datetime]::MinValue
+            }
+        }
+    } catch {
+        return [datetime]::MinValue
+    }
+    return [datetime]::MinValue
+}
+
 function Read-NewLines {
     param([string]$Path, [string]$Key)
     if (-not $Path -or -not (Test-Path $Path)) { return @() }
@@ -120,20 +147,31 @@ function Read-NewLines {
 $HistoryLines = 5
 $Positions = @{}
 
-Write-Host "=== Recent history (last $HistoryLines lines per source) ===`n" -ForegroundColor DarkGray
+Write-Host "=== Recent history (last $HistoryLines lines per source, merged by time) ===`n" -ForegroundColor DarkGray
 
+$historyBatch = @()
 foreach ($key in $Sources.Keys) {
     $src = $Sources[$key]
     $p = $src.Path
     if ($p -and (Test-Path $p)) {
         $recent = Get-Content -Path $p -Tail $HistoryLines -Encoding UTF8 -ErrorAction SilentlyContinue
         foreach ($line in $recent) {
-            if ($line) { Write-LogLine -Key $key -Src $src -Line $line }
+            if ($line) {
+                $historyBatch += [PSCustomObject]@{
+                    Time = Get-LineTimestamp -Line $line -Kind $src.Kind
+                    Key  = $key
+                    Src  = $src
+                    Line = $line
+                }
+            }
         }
         $Positions[$key] = (Get-Item $p).Length
     } else {
         $Positions[$key] = 0
     }
+}
+foreach ($item in ($historyBatch | Sort-Object Time)) {
+    Write-LogLine -Key $item.Key -Src $item.Src -Line $item.Line
 }
 
 Write-Host "`n=== Live tail (Ctrl+C to stop) ===`n" -ForegroundColor DarkGray
@@ -141,11 +179,23 @@ Write-Host "`n=== Live tail (Ctrl+C to stop) ===`n" -ForegroundColor DarkGray
 while ($true) {
     $Sources["DB"].Path = Get-LatestPgLogPath
 
+    $batch = @()
     foreach ($key in $Sources.Keys) {
         $src = $Sources[$key]
         $lines = Read-NewLines -Path $src.Path -Key $key
         foreach ($line in $lines) {
-            Write-LogLine -Key $key -Src $src -Line $line
+            $batch += [PSCustomObject]@{
+                Time = Get-LineTimestamp -Line $line -Kind $src.Kind
+                Key  = $key
+                Src  = $src
+                Line = $line
+            }
+        }
+    }
+
+    if ($batch.Count -gt 0) {
+        foreach ($item in ($batch | Sort-Object Time)) {
+            Write-LogLine -Key $item.Key -Src $item.Src -Line $item.Line
         }
     }
 
