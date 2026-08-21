@@ -1,9 +1,15 @@
-# SOC Logging Lab
+# SOC Logging Lab — Task Manager (Quản lý công việc cá nhân)
 
 Web app tối giản, đầy đủ logging, dùng để đào tạo SOC Tier 3 về log
-correlation. **Không phải để chạy production.** Kiến trúc: Frontend tĩnh
+correlation. **Không phải để chạy production.** Chủ đề nghiệp vụ: mỗi user
+quản lý danh sách công việc cá nhân của mình (tạo/xem/sửa/xoá task, có
+tiêu đề, độ ưu tiên, trạng thái, hạn hoàn thành). Kiến trúc: Frontend tĩnh
 → Nginx (reverse proxy) → FastAPI (backend) → PostgreSQL, mỗi thành phần
 một container Docker riêng.
+
+Tài liệu phân tích & thiết kế tính năng đầy đủ (bài toán, đối tượng dùng,
+chức năng, ERD, thiết kế API/màn hình) nằm ở
+[`PHAN_TICH_THIET_KE.md`](PHAN_TICH_THIET_KE.md).
 
 Bảng mapping chi tiết đầy đủ (Action → Event → Log location → Layer →
 Fields → Ghi chú SOC) nằm ở [`LOGGING_MAP.md`](LOGGING_MAP.md) — đọc file
@@ -17,6 +23,7 @@ soc-logging-lab/
 ├── .env.example
 ├── README.md
 ├── LOGGING_MAP.md
+├── PHAN_TICH_THIET_KE.md
 ├── frontend/            # HTML/CSS/JS thuần, được Nginx serve trực tiếp
 ├── nginx/nginx.conf      # reverse proxy + custom access_log format
 ├── backend/
@@ -36,7 +43,7 @@ Copy-Item .env.example .env
 docker compose up -d --build
 docker compose ps          # cả 3 container phải "healthy"/"running"
 
-# seed vài user + order mẫu
+# seed vài user + task mẫu
 docker compose exec backend python -m app.seed
 ```
 
@@ -69,10 +76,10 @@ Dừng lab: `docker compose down` (thêm `-v` nếu muốn xoá luôn volume DB)
 | `POST /api/auth/login` | Đăng nhập | `LOGIN_SUCCESS`/`LOGIN_FAIL`/`ACCOUNT_LOCKED` → `auth.log`; `login_success`/`login_fail` → `app.log` | Authentication + Application |
 | `POST /api/auth/logout` | Đăng xuất | `LOGOUT` → `auth.log`; UPDATE `sessions.revoked_at` → Postgres log | Authentication + Database |
 | `GET/PUT /api/users/{id}` | Xem/sửa profile | `profile_read`/`profile_update`/`authorization_denied` → `app.log` | Application |
-| `POST /api/orders` | Tạo order | `order_create` → `app.log`; INSERT → Postgres log | Application + Database |
-| `GET /api/orders`, `GET /api/orders/{id}` | Đọc order(s) | `order_read` → `app.log` (KHÔNG có gì ở Postgres log — SELECT không audit) | Application |
-| `PUT /api/orders/{id}` | Sửa order | `order_update` (kèm `changed_fields`) → `app.log`; UPDATE → Postgres log | Application + Database |
-| `DELETE /api/orders/{id}` | Xoá order | `order_delete` → `app.log`; DELETE → Postgres log | Application + Database |
+| `POST /api/tasks` | Tạo task | `task_create` → `app.log`; INSERT → Postgres log | Application + Database |
+| `GET /api/tasks`, `GET /api/tasks/{id}` | Đọc task(s) | `task_read` → `app.log` (KHÔNG có gì ở Postgres log — SELECT không audit) | Application |
+| `PUT /api/tasks/{id}` | Sửa task | `task_update` (kèm `changed_fields`) → `app.log`; UPDATE → Postgres log | Application + Database |
+| `DELETE /api/tasks/{id}` | Xoá task | `task_delete` → `app.log`; DELETE → Postgres log | Application + Database |
 | Mọi request không hợp lệ | — | `validation_error` → `app.log`, HTTP 400 | Application |
 | `GET /api/debug/crash` | Gây exception | `unhandled_exception` (kèm stack trace) → `app.log`, HTTP 500 (client chỉ thấy `request_id`) | Application |
 | Mọi request | — | 1 dòng access log JSON (kèm `session_id` cookie) → `nginx access.log` | Reverse Proxy |
@@ -101,6 +108,12 @@ docker logs -f soclab-db
 dung với file trong `logs/` (stdout được ghi song song với file, theo yêu
 cầu của lab) — dùng cái nào tuỳ bạn muốn thực hành thu log qua Docker
 logging driver hay đọc file trực tiếp.
+
+Xem trực tiếp dữ liệu trong Postgres (không phải log, mà là data thật):
+```powershell
+docker compose exec db psql -U soclab -d soclab -c "\dt"
+docker compose exec db psql -U soclab -d soclab -c "SELECT * FROM tasks;"
+```
 
 ## 6. Walkthrough 10 kịch bản
 
@@ -154,35 +167,35 @@ server chứ không chỉ xoá cookie.
 
 **6. Query (đọc dữ liệu)**
 ```powershell
-curl.exe -b cookies.txt http://localhost:8080/api/orders
+curl.exe -b cookies.txt http://localhost:8080/api/tasks
 ```
-→ xem: `logs/app/app.log` (`order_read`). Kiểm tra Postgres log cùng thời
+→ xem: `logs/app/app.log` (`task_read`). Kiểm tra Postgres log cùng thời
 điểm — sẽ **không** có gì (SELECT không audit), đối lập với bước 7-9.
 
 **7. Create**
 ```powershell
-curl.exe -b cookies.txt -X POST http://localhost:8080/api/orders `
+curl.exe -b cookies.txt -X POST http://localhost:8080/api/tasks `
   -H "Content-Type: application/json" `
-  -d '{"product_name":"Monitor","quantity":1,"unit_price":199.99,"status":"pending"}'
+  -d '{"title":"Viết báo cáo tuần","priority":"high","status":"todo","due_date":"2026-08-25"}'
 ```
-→ xem: `logs/app/app.log` (`order_create`) + Postgres log (`INSERT INTO
-orders`). Lưu lại `id` trả về để dùng ở bước 8-9.
+→ xem: `logs/app/app.log` (`task_create`) + Postgres log (`INSERT INTO
+tasks`). Lưu lại `id` trả về để dùng ở bước 8-9.
 
 **8. Update**
 ```powershell
-curl.exe -b cookies.txt -X PUT http://localhost:8080/api/orders/<order_id> `
+curl.exe -b cookies.txt -X PUT http://localhost:8080/api/tasks/<task_id> `
   -H "Content-Type: application/json" `
-  -d '{"status":"paid"}'
+  -d '{"status":"doing"}'
 ```
-→ xem: `logs/app/app.log` (`order_update`, có `changed_fields` với
-old/new) + Postgres log (`UPDATE orders`).
+→ xem: `logs/app/app.log` (`task_update`, có `changed_fields` với
+old/new) + Postgres log (`UPDATE tasks`).
 
 **9. Delete**
 ```powershell
-curl.exe -b cookies.txt -X DELETE http://localhost:8080/api/orders/<order_id>
+curl.exe -b cookies.txt -X DELETE http://localhost:8080/api/tasks/<task_id>
 ```
-→ xem: `logs/app/app.log` (`order_delete`) + Postgres log (`DELETE FROM
-orders`).
+→ xem: `logs/app/app.log` (`task_delete`) + Postgres log (`DELETE FROM
+tasks`).
 
 **10. Request không hợp lệ + gây exception**
 ```powershell
@@ -201,12 +214,12 @@ lệnh `debug/crash` chỉ có `detail` chung chung + `request_id` — dùng
 
 **Bonus — test IDOR** (điểm nhấn của lab):
 ```powershell
-# Login bằng bob, thử đọc profile hoặc order của alice bằng ID của alice
+# Login bằng bob, thử đọc profile hoặc task của alice bằng ID của alice
 curl.exe -c bob.txt -b bob.txt -X POST http://localhost:8080/api/auth/login `
   -H "Content-Type: application/json" -d '{"username":"bob","password":"Passw0rd!"}'
 
 curl.exe -b bob.txt http://localhost:8080/api/users/<alice_user_id>
-curl.exe -b bob.txt http://localhost:8080/api/orders/<alice_order_id>
+curl.exe -b bob.txt http://localhost:8080/api/tasks/<alice_task_id>
 ```
 → cả hai trả HTTP 403, và `logs/app/app.log` có `event=
 "authorization_denied"` với `owner_id != requester_id` — bằng chứng trực
@@ -217,7 +230,7 @@ tiếp cho detection rule IDOR.
 ```powershell
 docker compose exec backend python -m app.seed
 ```
-Tạo 3 user (`alice`, `bob`, `carol`, mật khẩu `Passw0rd!`) và vài order
+Tạo 3 user (`alice`, `bob`, `carol`, mật khẩu `Passw0rd!`) và vài task
 mẫu gắn với `alice`/`bob`. Script idempotent — chạy lại không tạo trùng
 user đã tồn tại.
 
@@ -242,3 +255,6 @@ user đã tồn tại.
   WSL2 backend thường không gặp vấn đề này).
 - Đổi port 8080: sửa `NGINX_PORT` trong `.env`, chạy lại
   `docker compose up -d`.
+- Nếu vừa `git pull`/đổi code frontend mà trình duyệt vẫn hiện bản cũ:
+  nhấn Ctrl+Shift+R để hard-refresh (trình duyệt cache file tĩnh theo
+  mặc định vì Nginx không set `Cache-Control` tường minh trong lab này).

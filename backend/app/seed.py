@@ -4,10 +4,10 @@ Run after `docker compose up -d` with:
     docker compose exec backend python -m app.seed
 """
 
-from decimal import Decimal
+from datetime import date, timedelta
 
 from app.database import Base, SessionLocal, engine, wait_for_db
-from app.models import Order, User
+from app.models import Task, User
 from app.security import hash_password
 
 DEMO_PASSWORD = "Passw0rd!"
@@ -18,13 +18,33 @@ DEMO_USERS = [
     {"username": "carol", "email": "carol@example.com", "password": DEMO_PASSWORD},
 ]
 
-DEMO_ORDERS = {
+TODAY = date.today()
+
+DEMO_TASKS = {
     "alice": [
-        {"product_name": "Laptop", "quantity": 1, "unit_price": Decimal("1200.00"), "status": "paid"},
-        {"product_name": "Mouse", "quantity": 2, "unit_price": Decimal("25.50"), "status": "pending"},
+        {
+            "title": "Chuẩn bị slide báo cáo tuần",
+            "description": "Tổng hợp tiến độ dự án SOC lab",
+            "priority": "high",
+            "status": "doing",
+            "due_date": TODAY + timedelta(days=2),
+        },
+        {
+            "title": "Đọc tài liệu FastAPI logging",
+            "description": None,
+            "priority": "low",
+            "status": "todo",
+            "due_date": None,
+        },
     ],
     "bob": [
-        {"product_name": "Keyboard", "quantity": 1, "unit_price": Decimal("75.00"), "status": "shipped"},
+        {
+            "title": "Fix bug đăng nhập",
+            "description": "Lỗi session hết hạn không revoke đúng",
+            "priority": "medium",
+            "status": "done",
+            "due_date": TODAY - timedelta(days=1),
+        },
     ],
     "carol": [],
 }
@@ -51,12 +71,12 @@ def main():
             db.commit()
             db.refresh(user)
 
-            orders = DEMO_ORDERS.get(user_data["username"], [])
-            for order_data in orders:
-                db.add(Order(user_id=user.id, **order_data))
+            tasks = DEMO_TASKS.get(user_data["username"], [])
+            for task_data in tasks:
+                db.add(Task(user_id=user.id, **task_data))
             db.commit()
 
-            print(f"Created user '{user.username}' (id={user.id}) with {len(orders)} order(s).")
+            print(f"Created user '{user.username}' (id={user.id}) with {len(tasks)} task(s).")
 
         print(f"\nAll demo users share the password: {DEMO_PASSWORD}")
     finally:

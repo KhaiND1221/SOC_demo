@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Orders - SOC Logging Lab</title>
+  <title>Tasks - SOC Logging Lab</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
@@ -11,46 +11,51 @@
     <a href="/register.html">Register</a>
     <a href="/login.html">Login</a>
     <a href="/profile.html">Profile</a>
-    <a href="/orders.html">Orders</a>
+    <a href="/tasks.html">Tasks</a>
   </nav>
 
-  <h1>Orders</h1>
+  <h1>Tasks</h1>
   <p class="muted" id="user-badge"></p>
 
-  <h2>My orders</h2>
+  <h2>My tasks</h2>
   <div class="card">
     <button id="refresh-btn">Refresh list</button>
-    <table id="orders-table">
+    <table id="tasks-table">
       <thead>
-        <tr><th>Product</th><th>Qty</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+        <tr><th>Title</th><th>Priority</th><th>Status</th><th>Due date</th><th>Actions</th></tr>
       </thead>
-      <tbody id="orders-body"></tbody>
+      <tbody id="tasks-body"></tbody>
     </table>
     <p id="list-msg" class="message"></p>
   </div>
 
-  <h2>Create order</h2>
+  <h2>Create task</h2>
   <div class="card">
-    <label for="c-product">Product name</label>
-    <input id="c-product" type="text" />
-    <label for="c-qty">Quantity</label>
-    <input id="c-qty" type="number" value="1" min="1" />
-    <label for="c-price">Unit price</label>
-    <input id="c-price" type="number" value="10.00" step="0.01" min="0" />
+    <label for="c-title">Title</label>
+    <input id="c-title" type="text" />
+    <label for="c-description">Description</label>
+    <input id="c-description" type="text" />
+    <label for="c-priority">Priority</label>
+    <select id="c-priority">
+      <option value="low">low</option>
+      <option value="medium" selected>medium</option>
+      <option value="high">high</option>
+    </select>
     <label for="c-status">Status</label>
     <select id="c-status">
-      <option value="pending">pending</option>
-      <option value="paid">paid</option>
-      <option value="shipped">shipped</option>
-      <option value="cancelled">cancelled</option>
+      <option value="todo" selected>todo</option>
+      <option value="doing">doing</option>
+      <option value="done">done</option>
     </select>
+    <label for="c-due">Due date (optional)</label>
+    <input id="c-due" type="date" />
     <button id="create-btn">Create</button>
     <p id="create-msg" class="message"></p>
   </div>
 
-  <h2>Lookup / edit by order ID (try another user's order id to test IDOR -> expect 403)</h2>
+  <h2>Lookup / edit by task ID (try another user's task id to test IDOR -> expect 403)</h2>
   <div class="card">
-    <label for="lookup-id">Order ID</label>
+    <label for="lookup-id">Task ID</label>
     <input id="lookup-id" type="text" />
     <button id="get-btn" class="secondary">GET</button>
     <button id="delete-btn" class="danger">DELETE</button>
@@ -59,10 +64,9 @@
     <label for="u-status">New status (PUT update)</label>
     <select id="u-status">
       <option value="">-- no change --</option>
-      <option value="pending">pending</option>
-      <option value="paid">paid</option>
-      <option value="shipped">shipped</option>
-      <option value="cancelled">cancelled</option>
+      <option value="todo">todo</option>
+      <option value="doing">doing</option>
+      <option value="done">done</option>
     </select>
     <button id="update-btn">PUT update status</button>
     <p id="lookup-msg" class="message"></p>
@@ -72,10 +76,10 @@
   <script>
     renderUserBadge("user-badge");
 
-    async function loadOrders() {
+    async function loadTasks() {
       const msgEl = document.getElementById("list-msg");
-      const body = document.getElementById("orders-body");
-      const res = await apiFetch("/orders");
+      const body = document.getElementById("tasks-body");
+      const res = await apiFetch("/tasks");
 
       if (!res.ok) {
         showMessage(msgEl, `Error ${res.status}`, true);
@@ -83,25 +87,25 @@
       }
 
       body.innerHTML = "";
-      res.data.forEach((o) => {
+      res.data.forEach((t) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${o.product_name}</td>
-          <td>${o.quantity}</td>
-          <td>${o.unit_price}</td>
-          <td>${o.status}</td>
+          <td>${t.title}</td>
+          <td>${t.priority}</td>
+          <td>${t.status}</td>
+          <td>${t.due_date || "-"}</td>
           <td class="row-actions">
-            <button class="secondary" data-id="${o.id}" data-action="view">View</button>
-            <button class="danger" data-id="${o.id}" data-action="delete">Delete</button>
+            <button class="secondary" data-id="${t.id}" data-action="view">View</button>
+            <button class="danger" data-id="${t.id}" data-action="delete">Delete</button>
           </td>`;
         body.appendChild(tr);
       });
-      showMessage(msgEl, `Loaded ${res.data.length} order(s).`);
+      showMessage(msgEl, `Loaded ${res.data.length} task(s).`);
     }
 
-    document.getElementById("refresh-btn").addEventListener("click", loadOrders);
+    document.getElementById("refresh-btn").addEventListener("click", loadTasks);
 
-    document.getElementById("orders-body").addEventListener("click", async (e) => {
+    document.getElementById("tasks-body").addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
       if (!btn) return;
       const id = btn.dataset.id;
@@ -110,39 +114,41 @@
         document.getElementById("lookup-id").value = id;
         document.getElementById("get-btn").click();
       } else if (btn.dataset.action === "delete") {
-        await apiFetch(`/orders/${id}`, { method: "DELETE" });
-        loadOrders();
+        await apiFetch(`/tasks/${id}`, { method: "DELETE" });
+        loadTasks();
       }
     });
 
     document.getElementById("create-btn").addEventListener("click", async () => {
       const msgEl = document.getElementById("create-msg");
-      const res = await apiFetch("/orders", {
+      const due = document.getElementById("c-due").value;
+      const res = await apiFetch("/tasks", {
         method: "POST",
         body: JSON.stringify({
-          product_name: document.getElementById("c-product").value.trim(),
-          quantity: parseInt(document.getElementById("c-qty").value, 10),
-          unit_price: parseFloat(document.getElementById("c-price").value),
+          title: document.getElementById("c-title").value.trim(),
+          description: document.getElementById("c-description").value.trim() || null,
+          priority: document.getElementById("c-priority").value,
           status: document.getElementById("c-status").value,
+          due_date: due || null,
         }),
       });
-      showMessage(msgEl, res.ok ? "Order created." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
-      if (res.ok) loadOrders();
+      showMessage(msgEl, res.ok ? "Task created." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
+      if (res.ok) loadTasks();
     });
 
     document.getElementById("get-btn").addEventListener("click", async () => {
       const out = document.getElementById("lookup-out");
       const id = document.getElementById("lookup-id").value.trim();
-      const res = await apiFetch(`/orders/${id}`);
+      const res = await apiFetch(`/tasks/${id}`);
       out.textContent = `HTTP ${res.status}\n` + JSON.stringify(res.data, null, 2);
     });
 
     document.getElementById("delete-btn").addEventListener("click", async () => {
       const msgEl = document.getElementById("lookup-msg");
       const id = document.getElementById("lookup-id").value.trim();
-      const res = await apiFetch(`/orders/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/tasks/${id}`, { method: "DELETE" });
       showMessage(msgEl, res.status === 204 ? "Deleted." : `Error ${res.status}`, res.status !== 204);
-      loadOrders();
+      loadTasks();
     });
 
     document.getElementById("update-btn").addEventListener("click", async () => {
@@ -151,12 +157,12 @@
       const status = document.getElementById("u-status").value;
       if (!status) { showMessage(msgEl, "Pick a status first.", true); return; }
 
-      const res = await apiFetch(`/orders/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
-      showMessage(msgEl, res.ok ? "Order updated." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
-      if (res.ok) loadOrders();
+      const res = await apiFetch(`/tasks/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
+      showMessage(msgEl, res.ok ? "Task updated." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
+      if (res.ok) loadTasks();
     });
 
-    loadOrders();
+    loadTasks();
   </script>
 </body>
 </html>

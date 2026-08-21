@@ -1,6 +1,5 @@
 import uuid
-from datetime import datetime
-from decimal import Decimal
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -32,28 +31,31 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class OrderCreate(BaseModel):
-    product_name: str = Field(min_length=1, max_length=255)
-    quantity: int = Field(gt=0)
-    unit_price: Decimal = Field(ge=0)
-    status: str = Field(default="pending", max_length=20)
+class TaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    priority: str = Field(default="medium", max_length=20)
+    status: str = Field(default="todo", max_length=20)
+    due_date: Optional[date] = None
 
 
-class OrderUpdate(BaseModel):
-    product_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    quantity: Optional[int] = Field(default=None, gt=0)
-    unit_price: Optional[Decimal] = Field(default=None, ge=0)
+class TaskUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    priority: Optional[str] = Field(default=None, max_length=20)
     status: Optional[str] = Field(default=None, max_length=20)
+    due_date: Optional[date] = None
 
 
-class OrderOut(BaseModel):
+class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     user_id: uuid.UUID
-    product_name: str
-    quantity: int
-    unit_price: Decimal
+    title: str
+    description: Optional[str]
+    priority: str
     status: str
+    due_date: Optional[date]
     created_at: datetime
     updated_at: datetime

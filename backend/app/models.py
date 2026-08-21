@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -23,7 +23,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
-    orders = relationship("Order", back_populates="user", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
 
 
 class Session(Base):
@@ -40,19 +40,20 @@ class Session(Base):
     user = relationship("User", back_populates="sessions")
 
 
-class Order(Base):
-    __tablename__ = "orders"
+class Task(Base):
+    __tablename__ = "tasks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    product_name = Column(String(255), nullable=False)
-    quantity = Column(Integer, nullable=False, default=1)
-    unit_price = Column(Numeric(10, 2), nullable=False, default=0)
-    status = Column(String(20), nullable=False, default="pending")
+    title = Column(String(255), nullable=False)
+    description = Column(String(2000), nullable=True)
+    priority = Column(String(20), nullable=False, default="medium")
+    status = Column(String(20), nullable=False, default="todo")
+    due_date = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
-    user = relationship("User", back_populates="orders")
+    user = relationship("User", back_populates="tasks")
 
 
 class LoginAttempt(Base):

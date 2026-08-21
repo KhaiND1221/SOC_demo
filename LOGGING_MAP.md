@@ -35,14 +35,14 @@ dùng lại đúng giá trị đó cho mọi dòng log trong request — nên 1 
 | Xem profile người khác (IDOR) | `authorization_denied` | `logs/app/app.log` | Application | `resource=user, resource_id, owner_id, requester_id` | HTTP 403. `requester_id != owner_id` là bằng chứng trực tiếp của một nỗ lực IDOR. |
 | Cập nhật profile của chính mình | `profile_update` | `logs/app/app.log` | Application | `changed_fields` (old/new; password bị mask thành `***`) | — |
 | Cập nhật profile người khác (IDOR) | `authorization_denied` | `logs/app/app.log` | Application | như trên | HTTP 403, không có UPDATE nào chạy ở DB. |
-| Tạo order | `order_create` | `logs/app/app.log` | Application | `order_id, product_name, quantity` | — |
-| Tạo order | (INSERT bảng `orders`) | `logs/postgres/postgresql-*.log` | Database | `INSERT INTO orders ...` | — |
-| Xem danh sách / chi tiết order (của chính mình) | `order_read` | `logs/app/app.log` | Application | `order_id` (chi tiết) hoặc `count` (danh sách) | Không có gì tương ứng trong log Postgres (SELECT không được audit) — tương phản có chủ đích với `order_create/update/delete`. |
-| Xem/sửa/xoá order của người khác (IDOR) | `authorization_denied` | `logs/app/app.log` | Application | `resource=order, resource_id, owner_id, requester_id` | HTTP 403. Đây là surface IDOR thứ 2 trong lab, độc lập với profile. |
-| Cập nhật order (của chính mình) | `order_update` | `logs/app/app.log` | Application | `order_id, changed_fields` (mỗi field: `{old, new}`) | Không log riêng giá trị nhạy cảm nào (orders không có dữ liệu nhạy cảm) nên log đầy đủ old/new. |
-| Cập nhật order | (UPDATE bảng `orders`) | `logs/postgres/postgresql-*.log` | Database | `UPDATE orders SET ...` | Đối chiếu field/giá trị mới với `changed_fields` ở app.log. |
-| Xoá order (của chính mình) | `order_delete` | `logs/app/app.log` | Application | `order_id` | — |
-| Xoá order | (DELETE bảng `orders`) | `logs/postgres/postgresql-*.log` | Database | `DELETE FROM orders WHERE id = ...` | — |
+| Tạo task | `task_create` | `logs/app/app.log` | Application | `task_id, title, priority` | — |
+| Tạo task | (INSERT bảng `tasks`) | `logs/postgres/postgresql-*.log` | Database | `INSERT INTO tasks ...` | — |
+| Xem danh sách / chi tiết task (của chính mình) | `task_read` | `logs/app/app.log` | Application | `task_id` (chi tiết) hoặc `count` (danh sách) | Không có gì tương ứng trong log Postgres (SELECT không được audit) — tương phản có chủ đích với `task_create/update/delete`. |
+| Xem/sửa/xoá task của người khác (IDOR) | `authorization_denied` | `logs/app/app.log` | Application | `resource=task, resource_id, owner_id, requester_id` | HTTP 403. Đây là surface IDOR thứ 2 trong lab, độc lập với profile. |
+| Cập nhật task (của chính mình) | `task_update` | `logs/app/app.log` | Application | `task_id, changed_fields` (mỗi field: `{old, new}`) | Ví dụ đổi `status` từ `todo` → `doing` sẽ log `changed_fields: {"status": {"old": "todo", "new": "doing"}}`. |
+| Cập nhật task | (UPDATE bảng `tasks`) | `logs/postgres/postgresql-*.log` | Database | `UPDATE tasks SET ...` | Đối chiếu field/giá trị mới với `changed_fields` ở app.log. |
+| Xoá task (của chính mình) | `task_delete` | `logs/app/app.log` | Application | `task_id` | — |
+| Xoá task | (DELETE bảng `tasks`) | `logs/postgres/postgresql-*.log` | Database | `DELETE FROM tasks WHERE id = ...` | — |
 | Gửi request sai định dạng/thiếu field bắt buộc | `validation_error` | `logs/app/app.log` | Application | `path, errors` (chi tiết lỗi pydantic) | HTTP 400. Không có stack trace vì đây là lỗi input hợp lệ về mặt xử lý, không phải exception. |
 | Gọi `GET /api/debug/crash` | `unhandled_exception` | `logs/app/app.log` | Application | `path, exception_type, stack_trace` | HTTP 500 trả về **chỉ** `{"detail": "...", "request_id": ...}` — KHÔNG có stack trace ra client. Stack trace đầy đủ chỉ nằm trong file/stdout server-side. Dùng `request_id` trong response để grep đúng dòng log. |
 | Bất kỳ hành động nào ở trên | tương ứng | `docker logs soclab-nginx` / `docker logs soclab-backend` / `docker logs soclab-db` | OS / Container | toàn bộ stdout của từng container | Tương đương "OS layer" trong bài lab — xem README mục "Xem log container". |
@@ -61,7 +61,7 @@ dùng lại đúng giá trị đó cho mọi dòng log trong request — nên 1 
 2. **Vì sao SELECT không xuất hiện trong log Postgres?**
    `log_statement = 'mod'` chỉ audit INSERT/UPDATE/DELETE. Đây là cấu hình
    Postgres thực tế phổ biến (log toàn bộ SELECT quá tốn dung lượng). Hệ
-   quả: mọi hành động "đọc" (`profile_read`, `order_read`) chỉ có thể quan
+   quả: mọi hành động "đọc" (`profile_read`, `task_read`) chỉ có thể quan
    sát được qua `app.log`, không có ở DB layer — một điểm dạy quan trọng
    về giới hạn của audit log DB.
 
