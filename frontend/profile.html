@@ -2,60 +2,93 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Profile - SOC Logging Lab</title>
+  <title>Profile - Task Manager</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <nav>
-    <a href="/index.html">Home</a>
-    <a href="/register.html">Register</a>
-    <a href="/login.html">Login</a>
-    <a href="/profile.html">Profile</a>
-    <a href="/tasks.html">Tasks</a>
-  </nav>
+  <header class="topnav">
+    <a href="/index.html" class="brand">
+      <span class="logo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </span>
+      Task Manager
+    </a>
+    <nav class="nav-links">
+      <a href="/index.html" data-page="home">Home</a>
+      <a href="/tasks.html" data-page="tasks">Tasks</a>
+      <a href="/profile.html" data-page="profile">Profile</a>
+    </nav>
+    <div class="user-area" id="user-area"></div>
+  </header>
 
-  <h1>Profile</h1>
-  <p class="muted" id="user-badge"></p>
+  <main class="page">
+    <span class="eyebrow">TÀI KHOẢN</span>
+    <h1>Hồ sơ cá nhân</h1>
+    <p class="subtitle" id="load-msg" style="margin-bottom:20px;"></p>
 
-  <div class="card">
-    <label for="user-id">User ID to load (defaults to your own; try a different user's id to test IDOR -> expect 403)</label>
-    <input id="user-id" type="text" />
-    <button id="load-btn">Load profile</button>
-    <p id="load-msg" class="message"></p>
-    <pre id="profile-out"></pre>
-  </div>
+    <div class="profile-grid">
+      <div class="card profile-side">
+        <div class="avatar-lg" id="avatar-initials">–</div>
+        <h2 id="disp-username" style="margin:4px 0 2px; font-size:18px;">–</h2>
+        <p class="muted" id="disp-created">–</p>
+      </div>
 
-  <h2>Update (only works on your own profile)</h2>
-  <div class="card">
-    <label for="email">New email (leave blank to keep unchanged)</label>
-    <input id="email" type="email" />
+      <div>
+        <div class="card">
+          <h3 class="section-title">Thông tin tài khoản</h3>
+          <label for="disp-username-field">Username</label>
+          <input id="disp-username-field" type="text" disabled />
+          <label for="disp-email">Email</label>
+          <input id="disp-email" type="text" disabled />
+        </div>
 
-    <label for="password">New password (leave blank to keep unchanged)</label>
-    <input id="password" type="password" />
+        <div class="card">
+          <h3 class="section-title">Cập nhật thông tin</h3>
+          <label for="email">Email mới (để trống nếu không đổi)</label>
+          <input id="email" type="email" />
 
-    <button id="save-btn">Save changes</button>
-    <p id="save-msg" class="message"></p>
-  </div>
+          <label for="password">Mật khẩu mới (để trống nếu không đổi)</label>
+          <input id="password" type="password" />
+
+          <button id="save-btn">Lưu thay đổi</button>
+          <p id="save-msg" class="message"></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">Task Manager — ứng dụng quản lý công việc cá nhân</footer>
 
   <script src="/js/api.js"></script>
   <script>
-    renderUserBadge("user-badge");
+    renderNavUser("user-area");
+    markActiveNav("profile");
     const stored = getStoredUser();
-    if (stored) document.getElementById("user-id").value = stored.id;
 
-    document.getElementById("load-btn").addEventListener("click", async () => {
+    async function loadProfile() {
       const msgEl = document.getElementById("load-msg");
-      const out = document.getElementById("profile-out");
-      const id = document.getElementById("user-id").value.trim();
 
-      const res = await apiFetch(`/users/${id}`);
-      out.textContent = `HTTP ${res.status}\n` + JSON.stringify(res.data, null, 2);
-      showMessage(msgEl, res.ok ? "Loaded." : `Error ${res.status}`, !res.ok);
-    });
+      if (!stored) {
+        showMessage(msgEl, "Bạn chưa đăng nhập.", true);
+        return;
+      }
+
+      const res = await apiFetch(`/users/${stored.id}`);
+      if (!res.ok) {
+        showMessage(msgEl, `Error ${res.status}`, true);
+        return;
+      }
+
+      const user = res.data;
+      document.getElementById("avatar-initials").textContent = user.username.slice(0, 2).toUpperCase();
+      document.getElementById("disp-username").textContent = user.username;
+      document.getElementById("disp-created").textContent = `Tham gia ${new Date(user.created_at).toLocaleDateString("vi-VN")}`;
+      document.getElementById("disp-username-field").value = user.username;
+      document.getElementById("disp-email").value = user.email;
+    }
 
     document.getElementById("save-btn").addEventListener("click", async () => {
       const msgEl = document.getElementById("save-msg");
-      const id = document.getElementById("user-id").value.trim();
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
 
@@ -63,9 +96,16 @@
       if (email) body.email = email;
       if (password) body.password = password;
 
-      const res = await apiFetch(`/users/${id}`, { method: "PUT", body: JSON.stringify(body) });
+      const res = await apiFetch(`/users/${stored.id}`, { method: "PUT", body: JSON.stringify(body) });
       showMessage(msgEl, res.ok ? "Profile updated." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
+      if (res.ok) {
+        document.getElementById("email").value = "";
+        document.getElementById("password").value = "";
+        loadProfile();
+      }
     });
+
+    loadProfile();
   </script>
 </body>
 </html>

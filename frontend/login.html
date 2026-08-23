@@ -2,30 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Login - SOC Logging Lab</title>
+  <title>Login - Task Manager</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <nav>
-    <a href="/index.html">Home</a>
-    <a href="/register.html">Register</a>
-    <a href="/login.html">Login</a>
-    <a href="/profile.html">Profile</a>
-    <a href="/tasks.html">Tasks</a>
-  </nav>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="icon-badge">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <h1>Welcome Back</h1>
+      <p class="subtitle muted">Đăng nhập để tiếp tục quản lý công việc.</p>
 
-  <h1>Login</h1>
-  <p class="muted">Session-based auth. After login a session_id cookie is set (HttpOnly). 5 failed attempts within 5 minutes (same IP or username) triggers a temporary lockout — see auth.log.</p>
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" />
 
-  <div class="card">
-    <label for="username">Username</label>
-    <input id="username" type="text" autocomplete="username" />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
 
-    <label for="password">Password</label>
-    <input id="password" type="password" autocomplete="current-password" />
+      <button id="login-btn">Sign In</button>
+      <p id="msg" class="message"></p>
 
-    <button id="login-btn">Login</button>
-    <p id="msg" class="message"></p>
+      <p class="muted" style="text-align:center;font-size:12px;margin-top:14px;">Sau 5 lần đăng nhập sai liên tiếp trong 5 phút, tài khoản sẽ tạm thời bị khoá.</p>
+
+      <div class="auth-footer">Chưa có tài khoản? <a href="/register.html">Đăng ký</a></div>
+    </div>
   </div>
 
   <script src="/js/api.js"></script>

@@ -2,55 +2,88 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>SOC Logging Lab</title>
+  <title>Home - Task Manager</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <nav>
-    <a href="/index.html">Home</a>
-    <a href="/register.html">Register</a>
-    <a href="/login.html">Login</a>
-    <a href="/profile.html">Profile</a>
-    <a href="/tasks.html">Tasks</a>
-  </nav>
+  <header class="topnav">
+    <a href="/index.html" class="brand">
+      <span class="logo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </span>
+      Task Manager
+    </a>
+    <nav class="nav-links">
+      <a href="/index.html" data-page="home">Home</a>
+      <a href="/tasks.html" data-page="tasks">Tasks</a>
+      <a href="/profile.html" data-page="profile">Profile</a>
+    </nav>
+    <div class="user-area" id="user-area"></div>
+  </header>
 
-  <h1>SOC Logging Lab</h1>
-  <p class="muted" id="user-badge"></p>
+  <main class="page">
+    <span class="eyebrow">DASHBOARD</span>
+    <h1 id="greeting">Chào mừng trở lại!</h1>
+    <p class="subtitle" id="subtitle">Đây là tổng quan công việc của bạn.</p>
 
-  <div class="card">
-    <p>Minimal web app with full logging across Nginx, FastAPI (app + auth loggers), and PostgreSQL, built for SOC Tier 3 log-correlation training. See the project README.md and LOGGING_MAP.md for the endpoint-to-log mapping and the 10 walkthrough scenarios.</p>
-  </div>
+    <div id="guest-card" class="card" style="display:none; margin-top:20px;">
+      <p>Bạn chưa đăng nhập. <a href="/login.html">Đăng nhập</a> để xem công việc của bạn.</p>
+    </div>
 
-  <h2>Session</h2>
-  <div class="card">
-    <button id="logout-btn">Logout</button>
-    <p id="logout-msg" class="message"></p>
-  </div>
+    <div id="dashboard" style="display:none; margin-top:20px;">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Tổng công việc</div>
+          <div class="stat-value" id="stat-total">–</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ưu tiên cao</div>
+          <div class="stat-value" id="stat-high">–</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Đến hạn hôm nay</div>
+          <div class="stat-value" id="stat-due">–</div>
+        </div>
+      </div>
 
-  <h2>Scenario: application exception (500)</h2>
-  <div class="card">
-    <p class="muted">Calls GET /api/debug/crash. The response only shows a generic message + request_id; the full stack trace is written server-side only (app.log, event="unhandled_exception"). Use the request_id below to grep the log.</p>
-    <button id="crash-btn">Trigger crash</button>
-    <pre id="crash-out"></pre>
-  </div>
+      <div class="card">
+        <h3 class="section-title">Bắt đầu</h3>
+        <p class="muted">Xem, tạo và cập nhật công việc trong trang Tasks.</p>
+        <a href="/tasks.html"><button>Xem danh sách công việc</button></a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">Task Manager — ứng dụng quản lý công việc cá nhân</footer>
 
   <script src="/js/api.js"></script>
   <script>
-    renderUserBadge("user-badge");
+    renderNavUser("user-area");
+    markActiveNav("home");
 
-    document.getElementById("logout-btn").addEventListener("click", async () => {
-      const msgEl = document.getElementById("logout-msg");
-      const res = await apiFetch("/auth/logout", { method: "POST" });
-      clearStoredUser();
-      renderUserBadge("user-badge");
-      showMessage(msgEl, res.status === 204 ? "Logged out." : "No active session.", res.status !== 204);
-    });
+    const stored = getStoredUser();
 
-    document.getElementById("crash-btn").addEventListener("click", async () => {
-      const out = document.getElementById("crash-out");
-      const res = await apiFetch("/debug/crash");
-      out.textContent = `HTTP ${res.status}\n` + JSON.stringify(res.data, null, 2);
-    });
+    async function loadDashboard() {
+      if (!stored) {
+        document.getElementById("guest-card").style.display = "block";
+        return;
+      }
+
+      document.getElementById("greeting").textContent = `Chào mừng trở lại, ${stored.username}!`;
+      document.getElementById("dashboard").style.display = "block";
+
+      const res = await apiFetch("/tasks");
+      if (!res.ok) return;
+
+      const tasks = res.data;
+      const today = new Date().toISOString().slice(0, 10);
+
+      document.getElementById("stat-total").textContent = tasks.length;
+      document.getElementById("stat-high").textContent = tasks.filter((t) => t.priority === "high").length;
+      document.getElementById("stat-due").textContent = tasks.filter((t) => t.due_date === today && t.status !== "done").length;
+    }
+
+    loadDashboard();
   </script>
 </body>
 </html>

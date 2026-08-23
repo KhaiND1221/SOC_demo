@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -56,6 +57,7 @@ def create_task(
         task_id=str(task.id),
         title=task.title,
         priority=task.priority,
+        category=task.category,
     )
 
     return task
@@ -63,10 +65,14 @@ def create_task(
 
 @router.get("", response_model=list[TaskOut])
 def list_tasks(
+    category: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db),
 ):
-    tasks = db.query(Task).filter(Task.user_id == current_user.id).all()
+    query = db.query(Task).filter(Task.user_id == current_user.id)
+    if category:
+        query = query.filter(Task.category == category)
+    tasks = query.all()
 
     log_event(
         app_logger,
@@ -76,6 +82,7 @@ def list_tasks(
         message="Task list read",
         user_id=str(current_user.id),
         count=len(tasks),
+        category_filter=category,
     )
 
     return tasks

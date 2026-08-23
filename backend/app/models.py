@@ -49,6 +49,7 @@ class Task(Base):
     description = Column(String(2000), nullable=True)
     priority = Column(String(20), nullable=False, default="medium")
     status = Column(String(20), nullable=False, default="todo")
+    category = Column(String(50), nullable=True, index=True)
     due_date = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)

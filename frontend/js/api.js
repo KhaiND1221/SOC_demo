@@ -24,23 +24,45 @@ function showMessage(el, text, isError = false) {
 
 function getStoredUser() {
   try {
-    return JSON.parse(localStorage.getItem("soclab_user") || "null");
+    return JSON.parse(localStorage.getItem("tm_user") || "null");
   } catch (e) {
     return null;
   }
 }
 
 function setStoredUser(user) {
-  localStorage.setItem("soclab_user", JSON.stringify(user));
+  localStorage.setItem("tm_user", JSON.stringify(user));
 }
 
 function clearStoredUser() {
-  localStorage.removeItem("soclab_user");
+  localStorage.removeItem("tm_user");
 }
 
-function renderUserBadge(elId) {
+function renderNavUser(elId) {
   const el = document.getElementById(elId);
   if (!el) return;
   const user = getStoredUser();
-  el.textContent = user ? `Logged in as ${user.username} (id: ${user.id})` : "Not logged in";
+
+  if (!user) {
+    el.innerHTML = `<a href="/login.html">Login</a> &nbsp;·&nbsp; <a href="/register.html">Register</a>`;
+    return;
+  }
+
+  const initials = user.username.slice(0, 2).toUpperCase();
+  el.innerHTML = `
+    <span class="avatar">${initials}</span>
+    <span class="muted">${user.username}</span>
+    <button class="secondary" id="nav-logout-btn" style="margin-top:0;padding:8px 14px;">Logout</button>`;
+
+  document.getElementById("nav-logout-btn").addEventListener("click", async () => {
+    await apiFetch("/auth/logout", { method: "POST" });
+    clearStoredUser();
+    window.location.href = "/login.html";
+  });
+}
+
+function markActiveNav(page) {
+  document.querySelectorAll(".nav-links a").forEach((a) => {
+    if (a.dataset.page === page) a.classList.add("active");
+  });
 }

@@ -36,6 +36,7 @@ class TaskCreate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=2000)
     priority: str = Field(default="medium", max_length=20)
     status: str = Field(default="todo", max_length=20)
+    category: Optional[str] = Field(default=None, max_length=50)
     due_date: Optional[date] = None
 
 
@@ -44,6 +45,7 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=2000)
     priority: Optional[str] = Field(default=None, max_length=20)
     status: Optional[str] = Field(default=None, max_length=20)
+    category: Optional[str] = Field(default=None, max_length=50)
     due_date: Optional[date] = None
 
 
@@ -56,6 +58,7 @@ class TaskOut(BaseModel):
     description: Optional[str]
     priority: str
     status: str
+    category: Optional[str]
     due_date: Optional[date]
     created_at: datetime
     updated_at: datetime

@@ -2,84 +2,116 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Tasks - SOC Logging Lab</title>
+  <title>Tasks - Task Manager</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <nav>
-    <a href="/index.html">Home</a>
-    <a href="/register.html">Register</a>
-    <a href="/login.html">Login</a>
-    <a href="/profile.html">Profile</a>
-    <a href="/tasks.html">Tasks</a>
-  </nav>
+  <header class="topnav">
+    <a href="/index.html" class="brand">
+      <span class="logo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </span>
+      Task Manager
+    </a>
+    <nav class="nav-links">
+      <a href="/index.html" data-page="home">Home</a>
+      <a href="/tasks.html" data-page="tasks">Tasks</a>
+      <a href="/profile.html" data-page="profile">Profile</a>
+    </nav>
+    <div class="user-area" id="user-area"></div>
+  </header>
 
-  <h1>Tasks</h1>
-  <p class="muted" id="user-badge"></p>
+  <main class="page">
+    <div class="page-header">
+      <div>
+        <span class="eyebrow">CÔNG VIỆC CỦA TÔI</span>
+        <h1>Tasks</h1>
+        <p class="subtitle">Quản lý và theo dõi công việc cần làm.</p>
+      </div>
+    </div>
 
-  <h2>My tasks</h2>
-  <div class="card">
-    <button id="refresh-btn">Refresh list</button>
-    <table id="tasks-table">
-      <thead>
-        <tr><th>Title</th><th>Priority</th><th>Status</th><th>Due date</th><th>Actions</th></tr>
-      </thead>
-      <tbody id="tasks-body"></tbody>
-    </table>
-    <p id="list-msg" class="message"></p>
-  </div>
+    <div class="card">
+      <h3 class="section-title">Danh sách</h3>
+      <div class="filters-bar">
+        <select id="filter-category">
+          <option value="">Tất cả danh mục</option>
+          <option value="work">work</option>
+          <option value="study">study</option>
+          <option value="personal">personal</option>
+        </select>
+        <button id="refresh-btn" class="secondary">Làm mới</button>
+      </div>
 
-  <h2>Create task</h2>
-  <div class="card">
-    <label for="c-title">Title</label>
-    <input id="c-title" type="text" />
-    <label for="c-description">Description</label>
-    <input id="c-description" type="text" />
-    <label for="c-priority">Priority</label>
-    <select id="c-priority">
-      <option value="low">low</option>
-      <option value="medium" selected>medium</option>
-      <option value="high">high</option>
-    </select>
-    <label for="c-status">Status</label>
-    <select id="c-status">
-      <option value="todo" selected>todo</option>
-      <option value="doing">doing</option>
-      <option value="done">done</option>
-    </select>
-    <label for="c-due">Due date (optional)</label>
-    <input id="c-due" type="date" />
-    <button id="create-btn">Create</button>
-    <p id="create-msg" class="message"></p>
-  </div>
+      <div class="table-scroll">
+        <table id="tasks-table">
+          <thead>
+            <tr><th>Tiêu đề</th><th>Ưu tiên</th><th>Trạng thái</th><th>Danh mục</th><th>Hạn chót</th><th>Thao tác</th></tr>
+          </thead>
+          <tbody id="tasks-body"></tbody>
+        </table>
+      </div>
+      <p id="list-msg" class="message"></p>
+    </div>
 
-  <h2>Lookup / edit by task ID (try another user's task id to test IDOR -> expect 403)</h2>
-  <div class="card">
-    <label for="lookup-id">Task ID</label>
-    <input id="lookup-id" type="text" />
-    <button id="get-btn" class="secondary">GET</button>
-    <button id="delete-btn" class="danger">DELETE</button>
-    <pre id="lookup-out"></pre>
+    <div class="card">
+      <h3 class="section-title">Tạo công việc mới</h3>
+      <label for="c-title">Tiêu đề</label>
+      <input id="c-title" type="text" />
+      <label for="c-description">Mô tả</label>
+      <input id="c-description" type="text" />
+      <label for="c-priority">Ưu tiên</label>
+      <select id="c-priority">
+        <option value="low">Thấp</option>
+        <option value="medium" selected>Trung bình</option>
+        <option value="high">Cao</option>
+      </select>
+      <label for="c-status">Trạng thái</label>
+      <select id="c-status">
+        <option value="todo" selected>Chưa làm</option>
+        <option value="doing">Đang làm</option>
+        <option value="done">Hoàn thành</option>
+      </select>
+      <label for="c-category">Danh mục (không bắt buộc)</label>
+      <input id="c-category" type="text" placeholder="work / study / personal" />
+      <label for="c-due">Hạn chót (không bắt buộc)</label>
+      <input id="c-due" type="date" />
+      <button id="create-btn">Thêm task</button>
+      <p id="create-msg" class="message"></p>
+    </div>
 
-    <label for="u-status">New status (PUT update)</label>
-    <select id="u-status">
-      <option value="">-- no change --</option>
-      <option value="todo">todo</option>
-      <option value="doing">doing</option>
-      <option value="done">done</option>
-    </select>
-    <button id="update-btn">PUT update status</button>
-    <p id="lookup-msg" class="message"></p>
+  </main>
+
+  <footer class="site-footer">Task Manager — ứng dụng quản lý công việc cá nhân</footer>
+
+  <div class="modal-overlay hidden" id="detail-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="detail-title">–</h3>
+        <button class="modal-close" id="detail-close">✕</button>
+      </div>
+      <div id="detail-body"></div>
+    </div>
   </div>
 
   <script src="/js/api.js"></script>
   <script>
-    renderUserBadge("user-badge");
+    renderNavUser("user-area");
+    markActiveNav("tasks");
+
+    const PRIORITY_LABEL = { low: "Thấp", medium: "Trung bình", high: "Cao" };
+    const STATUS_LABEL = { todo: "Chưa làm", doing: "Đang làm", done: "Hoàn thành" };
+
+    function isOverdue(t) {
+      if (!t.due_date || t.status === "done") return false;
+      return t.due_date < new Date().toISOString().slice(0, 10);
+    }
 
     async function loadTasks() {
       const msgEl = document.getElementById("list-msg");
       const body = document.getElementById("tasks-body");
-      const res = await apiFetch("/tasks");
+      const category = document.getElementById("filter-category").value;
+      const qs = category ? `?category=${encodeURIComponent(category)}` : "";
+      const res = await apiFetch(`/tasks${qs}`);
 
       if (!res.ok) {
         showMessage(msgEl, `Error ${res.status}`, true);
@@ -89,21 +121,57 @@
       body.innerHTML = "";
       res.data.forEach((t) => {
         const tr = document.createElement("tr");
+        const overdueBadge = isOverdue(t) ? `<span class="badge badge-overdue">Quá hạn</span>` : "";
+        const categoryBadge = t.category ? `<span class="badge badge-category">${t.category}</span>` : `<span class="muted">-</span>`;
+
         tr.innerHTML = `
           <td>${t.title}</td>
-          <td>${t.priority}</td>
-          <td>${t.status}</td>
-          <td>${t.due_date || "-"}</td>
+          <td><span class="badge badge-priority-${t.priority}">${PRIORITY_LABEL[t.priority] || t.priority}</span></td>
+          <td>
+            <select data-id="${t.id}" class="status-select status-${t.status}">
+              <option value="todo" ${t.status === "todo" ? "selected" : ""}>Chưa làm</option>
+              <option value="doing" ${t.status === "doing" ? "selected" : ""}>Đang làm</option>
+              <option value="done" ${t.status === "done" ? "selected" : ""}>Hoàn thành</option>
+            </select>
+          </td>
+          <td>${categoryBadge}</td>
+          <td>${t.due_date || "-"} ${overdueBadge}</td>
           <td class="row-actions">
-            <button class="secondary" data-id="${t.id}" data-action="view">View</button>
-            <button class="danger" data-id="${t.id}" data-action="delete">Delete</button>
+            <button class="secondary" data-id="${t.id}" data-action="view">Xem</button>
+            <button class="danger" data-id="${t.id}" data-action="delete">Xoá</button>
           </td>`;
         body.appendChild(tr);
       });
-      showMessage(msgEl, `Loaded ${res.data.length} task(s).`);
+      showMessage(msgEl, `Đã tải ${res.data.length} công việc.`);
     }
 
     document.getElementById("refresh-btn").addEventListener("click", loadTasks);
+    document.getElementById("filter-category").addEventListener("change", loadTasks);
+
+    function openDetailModal(t) {
+      document.getElementById("detail-title").textContent = t.title;
+      document.getElementById("detail-body").innerHTML = `
+        <div class="detail-row"><span class="detail-label">Mô tả</span><span class="detail-value">${t.description || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Ưu tiên</span><span class="detail-value"><span class="badge badge-priority-${t.priority}">${PRIORITY_LABEL[t.priority] || t.priority}</span></span></div>
+        <div class="detail-row"><span class="detail-label">Trạng thái</span><span class="detail-value">${STATUS_LABEL[t.status] || t.status}</span></div>
+        <div class="detail-row"><span class="detail-label">Danh mục</span><span class="detail-value">${t.category || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Hạn chót</span><span class="detail-value">${t.due_date || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Tạo lúc</span><span class="detail-value">${new Date(t.created_at).toLocaleString("vi-VN")}</span></div>
+        <div class="detail-row"><span class="detail-label">Cập nhật lúc</span><span class="detail-value">${new Date(t.updated_at).toLocaleString("vi-VN")}</span></div>`;
+      document.getElementById("detail-modal").classList.remove("hidden");
+    }
+
+    function closeDetailModal() {
+      document.getElementById("detail-modal").classList.add("hidden");
+    }
+
+    document.getElementById("detail-close").addEventListener("click", closeDetailModal);
+    document.getElementById("detail-modal").addEventListener("click", (e) => {
+      if (e.target.id === "detail-modal") closeDetailModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeDetailModal();
+    });
 
     document.getElementById("tasks-body").addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
@@ -111,12 +179,23 @@
       const id = btn.dataset.id;
 
       if (btn.dataset.action === "view") {
-        document.getElementById("lookup-id").value = id;
-        document.getElementById("get-btn").click();
+        const res = await apiFetch(`/tasks/${id}`);
+        if (res.ok) openDetailModal(res.data);
       } else if (btn.dataset.action === "delete") {
         await apiFetch(`/tasks/${id}`, { method: "DELETE" });
         loadTasks();
       }
+    });
+
+    document.getElementById("tasks-body").addEventListener("change", async (e) => {
+      const select = e.target.closest(".status-select");
+      if (!select) return;
+      const newStatus = select.value;
+      select.className = `status-select status-${newStatus}`;
+      await apiFetch(`/tasks/${select.dataset.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newStatus }),
+      });
     });
 
     document.getElementById("create-btn").addEventListener("click", async () => {
@@ -129,36 +208,11 @@
           description: document.getElementById("c-description").value.trim() || null,
           priority: document.getElementById("c-priority").value,
           status: document.getElementById("c-status").value,
+          category: document.getElementById("c-category").value.trim() || null,
           due_date: due || null,
         }),
       });
       showMessage(msgEl, res.ok ? "Task created." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
-      if (res.ok) loadTasks();
-    });
-
-    document.getElementById("get-btn").addEventListener("click", async () => {
-      const out = document.getElementById("lookup-out");
-      const id = document.getElementById("lookup-id").value.trim();
-      const res = await apiFetch(`/tasks/${id}`);
-      out.textContent = `HTTP ${res.status}\n` + JSON.stringify(res.data, null, 2);
-    });
-
-    document.getElementById("delete-btn").addEventListener("click", async () => {
-      const msgEl = document.getElementById("lookup-msg");
-      const id = document.getElementById("lookup-id").value.trim();
-      const res = await apiFetch(`/tasks/${id}`, { method: "DELETE" });
-      showMessage(msgEl, res.status === 204 ? "Deleted." : `Error ${res.status}`, res.status !== 204);
-      loadTasks();
-    });
-
-    document.getElementById("update-btn").addEventListener("click", async () => {
-      const msgEl = document.getElementById("lookup-msg");
-      const id = document.getElementById("lookup-id").value.trim();
-      const status = document.getElementById("u-status").value;
-      if (!status) { showMessage(msgEl, "Pick a status first.", true); return; }
-
-      const res = await apiFetch(`/tasks/${id}`, { method: "PUT", body: JSON.stringify({ status }) });
-      showMessage(msgEl, res.ok ? "Task updated." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
       if (res.ok) loadTasks();
     });
 

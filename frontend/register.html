@@ -2,32 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Register - SOC Logging Lab</title>
+  <title>Register - Task Manager</title>
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <nav>
-    <a href="/index.html">Home</a>
-    <a href="/register.html">Register</a>
-    <a href="/login.html">Login</a>
-    <a href="/profile.html">Profile</a>
-    <a href="/tasks.html">Tasks</a>
-  </nav>
+  <div class="auth-shell">
+    <div class="auth-card">
+      <div class="icon-badge">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+      </div>
+      <h1>Create Account</h1>
+      <p class="subtitle muted">Đăng ký để bắt đầu quản lý công việc.</p>
 
-  <h1>Register</h1>
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" />
 
-  <div class="card">
-    <label for="username">Username</label>
-    <input id="username" type="text" autocomplete="username" />
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" />
 
-    <label for="email">Email</label>
-    <input id="email" type="email" autocomplete="email" />
+      <label for="password">Password (min 8 chars)</label>
+      <input id="password" type="password" autocomplete="new-password" />
 
-    <label for="password">Password (min 8 chars)</label>
-    <input id="password" type="password" autocomplete="new-password" />
+      <button id="register-btn">Register</button>
+      <p id="msg" class="message"></p>
 
-    <button id="register-btn">Register</button>
-    <p id="msg" class="message"></p>
+      <div class="auth-footer">Đã có tài khoản? <a href="/login.html">Đăng nhập</a></div>
+    </div>
   </div>
 
   <script src="/js/api.js"></script>

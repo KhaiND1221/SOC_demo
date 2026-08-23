@@ -1,19 +1,18 @@
-# PHÂN TÍCH & THIẾT KẾ ỨNG DỤNG — Task Manager (SOC Logging Lab)
+# PHÂN TÍCH & THIẾT KẾ ỨNG DỤNG — Task Manager
 
-Tài liệu này gồm 2 phần: (A) trả lời các câu hỏi lý thuyết nền tảng về
-ứng dụng web, áp dụng trực tiếp vào ứng dụng đã xây dựng trong repo này;
-(B) bản phân tích & thiết kế tính năng của ứng dụng theo đúng yêu cầu đề
-bài ("Lập trình và triển khai cài đặt 1 ứng dụng web").
+Tài liệu này gồm 2 phần: (A) cơ sở lý thuyết nền tảng về ứng dụng web,
+áp dụng trực tiếp vào các quyết định thiết kế của ứng dụng trong repo
+này; (B) bản phân tích & thiết kế tính năng của ứng dụng.
 
 ---
 
-## PHẦN A — LÝ THUYẾT NỀN TẢNG (áp dụng vào ứng dụng đã xây)
+## PHẦN A — CƠ SỞ LÝ THUYẾT (áp dụng vào ứng dụng đã xây)
 
 ### A1. Cấu trúc của một ứng dụng web điển hình
 
-| Lớp | Công nghệ phổ biến (đề bài liệt kê) | Công nghệ dùng trong lab này | Vai trò trong lab |
+| Lớp | Công nghệ phổ biến | Công nghệ dùng trong ứng dụng này | Vai trò |
 |---|---|---|---|
-| Frontend (trình duyệt client) | HTML, CSS | HTML/CSS/JS thuần (`frontend/`) | Render UI, gọi REST API qua `fetch()`, không có business logic nhạy cảm (mọi validate/authZ thật đều nằm ở backend). |
+| Frontend (trình duyệt client) | HTML, CSS, JS | HTML/CSS/JS thuần (`frontend/`) | Render UI, gọi REST API qua `fetch()`, không có business logic nhạy cảm (mọi validate/authZ thật đều nằm ở backend). |
 | Backend | PHP, Python, .NET | Python — FastAPI (`backend/app/`) | Chứa toàn bộ business logic: auth, session, CRUD task, log. |
 | Web server | IIS, Apache, Tomcat | Nginx (`nginx/nginx.conf`) | Vừa là web server (serve file tĩnh của frontend) vừa là reverse proxy (forward `/api/*` sang FastAPI), là nơi TLS sẽ termination nếu triển khai HTTPS thật. |
 | Database | MS SQL, MySQL, MongoDB | PostgreSQL (`db/`) | RDBMS mã nguồn mở, cùng nhóm quan hệ (relational) với MS SQL/MySQL — phù hợp vì dữ liệu có quan hệ khoá ngoại rõ ràng (users → sessions, users → tasks). |
@@ -41,9 +40,9 @@ PostgreSQL (users, sessions, tasks, login_attempts)
 - **Web động**: nội dung được server sinh ra tuỳ theo request (tham số,
   người dùng đăng nhập, dữ liệu trong DB), có xử lý logic phía server.
 
-**Ứng dụng trong lab là web động**, cụ thể theo mô hình "trang tĩnh gọi
-API động" (khác với web động truyền thống kiểu PHP nhúng HTML render
-sẵn ở server):
+**Ứng dụng này là web động**, cụ thể theo mô hình "trang tĩnh gọi API
+động" (khác với web động truyền thống kiểu PHP nhúng HTML render sẵn ở
+server):
 - Các file `.html/.css/.js` trong `frontend/` bản thân chúng là tĩnh —
   Nginx trả về y nguyên, không đổi theo user.
 - Nhưng **dữ liệu hiển thị bên trong** (danh sách task, thông tin
@@ -74,9 +73,9 @@ server (bảng `sessions`) — cho phép huỷ session tức thời bất cứ l
 **Cookie** (`session_id`, set trong `backend/app/routers/auth.py`):
 - `HttpOnly`: JavaScript phía client không đọc được cookie này → giảm
   rủi ro bị đánh cắp qua XSS.
-- `Secure`: cookie chỉ được trình duyệt gửi qua kết nối HTTPS. **Trong
-  lab đang tắt** (`SESSION_COOKIE_SECURE=false`) vì chạy HTTP trên
-  localhost — phải bật lại khi có HTTPS thật (xem README mục 8).
+- `Secure`: cookie chỉ được trình duyệt gửi qua kết nối HTTPS. Trong
+  môi trường dev đang tắt (`SESSION_COOKIE_SECURE=false`) vì chạy HTTP
+  trên localhost — phải bật lại khi có HTTPS thật (xem README mục 3, 6).
 - `SameSite=Strict`: cookie không được gửi kèm khi request bắt nguồn từ
   site khác → giảm rủi ro CSRF.
 
@@ -85,23 +84,9 @@ server (bảng `sessions`) — cho phép huỷ session tức thời bất cứ l
 status code (200/201/400/401/403/404/429/500). Toàn bộ endpoint liệt kê ở
 mục B6 bên dưới.
 
-### A4. Các loại log trên ứng dụng web và ý nghĩa
-
-Ứng dụng ghi log ở đúng 4 lớp độc lập, mỗi lớp phục vụ một góc nhìn khác
-nhau khi điều tra sự cố (bảng đầy đủ + ý nghĩa SOC ở
-[`LOGGING_MAP.md`](LOGGING_MAP.md)):
-
-| Loại log | Layer | Trả lời câu hỏi | Ví dụ |
-|---|---|---|---|
-| Access/error log của web server | Nginx | Ai gọi gì, từ đâu, kết quả HTTP nào, mất bao lâu? | `remote_addr, uri, status, request_time` |
-| Application log (structured JSON) | FastAPI (`app.log`) | Hành động nghiệp vụ nào xảy ra, do ai, thành công hay thất bại? | `event=task_create, user_id, result` |
-| Authentication log | FastAPI (`auth.log`, logger riêng) | Ai đăng nhập/đăng xuất, có ai đang bị brute-force không? | `event=ACCOUNT_LOCKED, fail_count` |
-| Audit log của database | PostgreSQL | Dữ liệu nào **thực sự bị thay đổi** ở tầng thấp nhất, bất kể qua đường nào? | `INSERT INTO tasks ...` |
-
-Log ở layer thấp hơn (DB) là bằng chứng khó giả mạo nhất nếu tầng
-application bị compromise; log ở layer cao hơn (app) giàu ngữ cảnh nghiệp
-vụ hơn nhưng phụ thuộc code có log đúng hay không — đây là lý do một hệ
-thống SOC trưởng thành cần cả 2, không chỉ 1.
+Các loại log ứng dụng sinh ra khi vận hành (access log, application log,
+authentication log, audit log database) và ý nghĩa của từng loại được
+phân tích riêng ở [`LOGGING_MAP.md`](LOGGING_MAP.md).
 
 ---
 
@@ -114,7 +99,7 @@ người dùng có tài khoản riêng, tự tạo/theo dõi/cập nhật/xoá d
 công việc cần làm của chính mình (tiêu đề, mô tả, độ ưu tiên, trạng thái,
 hạn hoàn thành). Không có vai trò quản trị/chia sẻ công việc giữa nhiều
 người dùng — phạm vi tập trung vào việc dựng đúng kiến trúc web chuẩn 4
-lớp (frontend/proxy/backend/database) và ghi log đầy đủ ở từng lớp.
+lớp (frontend/proxy/backend/database).
 
 ### B2. Đối tượng sử dụng
 
@@ -133,12 +118,13 @@ lớp (frontend/proxy/backend/database) và ghi log đầy đủ ở từng lớ
 | FR3 | Đăng xuất | Huỷ session thật ở server (`revoked_at`), không chỉ xoá cookie |
 | FR4 | Hết hạn phiên tự động | Session hết hạn sau `SESSION_TIMEOUT_MINUTES` (mặc định 30) kể từ lúc login |
 | FR5 | Khoá tài khoản tạm thời | 5 lần đăng nhập sai liên tiếp trong 5 phút (cùng IP hoặc username) → khoá 5 phút |
-| FR6 | Xem/cập nhật hồ sơ cá nhân | Chỉ được xem/sửa hồ sơ của chính mình (authorization rõ ràng, chống IDOR) |
+| FR6 | Xem/cập nhật hồ sơ cá nhân | Chỉ được xem/sửa hồ sơ của chính mình (chống truy cập trái phép) |
 | FR7 | Tạo công việc | title, description, priority, status, due_date |
 | FR8 | Xem danh sách/chi tiết công việc | Chỉ thấy công việc của chính mình |
 | FR9 | Cập nhật công việc | Chỉ chủ sở hữu được sửa; ghi log giá trị cũ/mới từng field thay đổi |
 | FR10 | Xoá công việc | Chỉ chủ sở hữu được xoá |
 | FR11 | Ghi log đầy đủ | Mọi hành động ở FR1–FR10 đều để lại log ở đúng layer tương ứng (xem LOGGING_MAP.md) |
+| FR12 | Gắn nhãn (category) & lọc công việc theo nhãn | Mỗi task có thể gắn 1 nhãn tự do (VD: `work`, `study`, `personal`); danh sách task lọc được theo nhãn. Bổ sung ở đợt nâng cấp — xem [`VAN_HANH_NANG_CAP.md`](VAN_HANH_NANG_CAP.md). |
 
 ### B4. Thiết kế cơ sở dữ liệu
 
@@ -183,6 +169,7 @@ users (0..1) ───< login_attempts  (liên kết lỏng qua "username" — v
 | description | varchar(2000), nullable | |
 | priority | varchar(20) | `low` / `medium` / `high` |
 | status | varchar(20) | `todo` / `doing` / `done` |
+| category | varchar(50), nullable | Nhãn tự do (VD: `work`/`study`/`personal`); thêm ở đợt nâng cấp, xem `VAN_HANH_NANG_CAP.md` |
 | due_date | date, nullable | |
 | created_at / updated_at | timestamptz | |
 
@@ -217,40 +204,37 @@ users (0..1) ───< login_attempts  (liên kết lỏng qua "username" — v
 | GET | `/api/users/{id}` | Xem hồ sơ (chỉ chính mình) | Cần session | 200 |
 | PUT | `/api/users/{id}` | Sửa hồ sơ (chỉ chính mình) | Cần session | 200 |
 | POST | `/api/tasks` | Tạo task | Cần session | 201 |
-| GET | `/api/tasks` | Danh sách task của mình | Cần session | 200 |
+| GET | `/api/tasks?category=` | Danh sách task của mình, lọc theo nhãn (query param `category` optional) | Cần session | 200 |
 | GET | `/api/tasks/{id}` | Chi tiết 1 task (chỉ chủ sở hữu) | Cần session | 200 |
 | PUT | `/api/tasks/{id}` | Cập nhật task (chỉ chủ sở hữu) | Cần session | 200 |
 | DELETE | `/api/tasks/{id}` | Xoá task (chỉ chủ sở hữu) | Cần session | 204 |
-| GET | `/api/debug/crash` | Gây lỗi 500 có chủ đích (phục vụ luyện tập) | Không | — (luôn 500) |
 | GET | `/api/health` | Health check cho container | Không | 200 |
 
 Mã lỗi dùng chung: `400` (validation), `401` (chưa đăng nhập/session hết
-hạn), `403` (không phải chủ sở hữu — IDOR bị chặn), `404` (không tồn
-tại), `429` (bị khoá do đăng nhập sai nhiều lần), `500` (lỗi hệ thống,
-không lộ stack trace).
+hạn), `403` (không phải chủ sở hữu), `404` (không tồn tại), `429` (bị
+khoá do đăng nhập sai nhiều lần), `500` (lỗi hệ thống, không lộ stack
+trace).
 
 ### B7. Thiết kế giao diện
 
 | Trang | File | Nội dung chính |
 |---|---|---|
-| Trang chủ | `index.html` | Trạng thái đăng nhập, nút logout, khu vực test kịch bản crash 500 |
+| Trang chủ | `index.html` | Trạng thái đăng nhập, nút logout |
 | Đăng ký | `register.html` | Form username/email/password |
 | Đăng nhập | `login.html` | Form username/password, redirect về trang chủ khi thành công |
-| Hồ sơ | `profile.html` | Xem/sửa hồ sơ theo `user_id` nhập tay (phục vụ test IDOR) |
-| Công việc | `tasks.html` | Danh sách task dạng bảng, form tạo mới, tra cứu/sửa/xoá theo `task_id` nhập tay (phục vụ test IDOR) |
+| Hồ sơ | `profile.html` | Xem/sửa hồ sơ của người đang đăng nhập |
+| Công việc | `tasks.html` | Danh sách task dạng bảng (đổi trạng thái inline), form tạo mới, xem chi tiết/xoá theo từng dòng |
 
 Luồng điều hướng chính: `Register → Login → (Home / Profile / Tasks)`.
 Mọi trang sau Login đều gọi API với cookie session có sẵn trong trình
 duyệt (`credentials: same-origin`); nếu session hết hạn, API trả 401 và
-UI hiển thị lỗi trực tiếp (không có redirect tự động về Login trong lab
-này — cố ý giữ đơn giản để bạn thấy rõ lỗi 401/`SESSION_EXPIRED` thay vì
-bị che đi bởi 1 redirect im lặng).
+UI hiển thị lỗi trực tiếp.
 
 ### B8. Thiết kế logging
 
 Xem chi tiết đầy đủ (Action → Event → Log location → Layer → Fields →
-Ghi chú SOC) tại [`LOGGING_MAP.md`](LOGGING_MAP.md). Nguyên tắc thiết kế
-cốt lõi:
+ý nghĩa khi phân tích sự cố) tại [`LOGGING_MAP.md`](LOGGING_MAP.md).
+Nguyên tắc thiết kế cốt lõi:
 - Mỗi action nghiệp vụ có ít nhất 1 dòng log ở layer Application, có
   `request_id` để correlate ngược lên Nginx access log.
 - Hành động liên quan xác thực (login/logout) được log **kép**: 1 lần ở

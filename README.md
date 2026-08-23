@@ -1,24 +1,28 @@
-# SOC Logging Lab — Task Manager (Quản lý công việc cá nhân)
+# Task Manager
 
-Web app tối giản, đầy đủ logging, dùng để đào tạo SOC Tier 3 về log
-correlation. **Không phải để chạy production.** Chủ đề nghiệp vụ: mỗi user
-quản lý danh sách công việc cá nhân của mình (tạo/xem/sửa/xoá task, có
-tiêu đề, độ ưu tiên, trạng thái, hạn hoàn thành). Kiến trúc: Frontend tĩnh
-→ Nginx (reverse proxy) → FastAPI (backend) → PostgreSQL, mỗi thành phần
-một container Docker riêng.
+Ứng dụng web quản lý công việc cá nhân: mỗi người dùng đăng ký tài
+khoản riêng, tự tạo/xem/sửa/xoá danh sách công việc cần làm của mình
+(tiêu đề, mô tả, độ ưu tiên, trạng thái, hạn hoàn thành).
 
-Tài liệu phân tích & thiết kế tính năng đầy đủ (bài toán, đối tượng dùng,
+Kiến trúc: Frontend tĩnh → Nginx (reverse proxy) → FastAPI (backend) →
+PostgreSQL, mỗi thành phần một container Docker riêng.
+
+Tài liệu phân tích & thiết kế tính năng (bài toán, đối tượng dùng,
 chức năng, ERD, thiết kế API/màn hình) nằm ở
 [`PHAN_TICH_THIET_KE.md`](PHAN_TICH_THIET_KE.md).
 
-Bảng mapping chi tiết đầy đủ (Action → Event → Log location → Layer →
-Fields → Ghi chú SOC) nằm ở [`LOGGING_MAP.md`](LOGGING_MAP.md) — đọc file
-đó khi bạn cần đối chiếu trực tiếp với tài liệu lý thuyết.
+Báo cáo phân tích log sinh ra khi ứng dụng hoạt động (theo dõi luồng
+hoạt động, sự kiện truy cập/đăng nhập/thao tác/lỗi ở từng layer) nằm ở
+[`LOGGING_MAP.md`](LOGGING_MAP.md).
+
+Tài liệu vận hành & nâng cấp mã nguồn (thêm tính năng mới vào ứng dụng
+đang chạy, migration DB, các vấn đề cần quan tâm) nằm ở
+[`VAN_HANH_NANG_CAP.md`](VAN_HANH_NANG_CAP.md).
 
 ## 1. Cấu trúc thư mục
 
 ```
-soc-logging-lab/
+SOC_demo/
 ├── docker-compose.yml
 ├── .env.example
 ├── README.md
@@ -31,10 +35,11 @@ soc-logging-lab/
 │   ├── requirements.txt
 │   └── app/               # FastAPI: routers, models, logging, middleware
 ├── db/postgresql.conf    # log_statement=mod + logging_collector
+├── db/migrations/        # migration SQL cho các đợt nâng cấp schema
 └── logs/                 # bind-mount ra host: nginx/, app/, postgres/
 ```
 
-## 2. Chạy lab
+## 2. Chạy ứng dụng
 
 ```powershell
 Copy-Item .env.example .env
@@ -53,7 +58,8 @@ nếu 8080 đã bị chiếm).
 Tài khoản demo sau khi seed: `alice` / `bob` / `carol`, mật khẩu chung
 `Passw0rd!` (in ra console khi seed chạy xong).
 
-Dừng lab: `docker compose down` (thêm `-v` nếu muốn xoá luôn volume DB).
+Dừng ứng dụng: `docker compose down` (thêm `-v` nếu muốn xoá luôn
+volume DB).
 
 ## 3. Biến môi trường (`.env.example`)
 
@@ -63,28 +69,28 @@ Dừng lab: `docker compose down` (thêm `-v` nếu muốn xoá luôn volume DB)
 | `NGINX_PORT` | Port host map vào Nginx (mặc định 8080). |
 | `SESSION_COOKIE_NAME` | Tên cookie session (mặc định `session_id`). |
 | `SESSION_TIMEOUT_MINUTES` | Thời gian sống tuyệt đối của session kể từ lúc login (mặc định 30). |
-| `SESSION_COOKIE_SECURE` | **`false` chỉ chấp nhận được vì lab chạy HTTP local.** Nếu bạn từng deploy lab này qua HTTPS (kể cả staging), phải đổi thành `true` trước — nếu không cookie session sẽ bị gửi qua cả kênh không mã hoá. |
+| `SESSION_COOKIE_SECURE` | `false` chỉ chấp nhận được khi chạy HTTP local. Khi deploy qua HTTPS phải đổi thành `true`, nếu không cookie session sẽ bị gửi qua cả kênh không mã hoá. |
 | `SESSION_COOKIE_SAMESITE` | Mặc định `strict`. |
 | `RATE_LIMIT_MAX_ATTEMPTS/WINDOW_MINUTES/LOCKOUT_MINUTES` | Ngưỡng khoá tài khoản sau nhiều lần login sai. |
 | `LOG_LEVEL` | Mức log cho 2 logger `app` và `auth` (mặc định `INFO`). |
 
-## 4. Bảng mapping (rút gọn — bản đầy đủ ở LOGGING_MAP.md)
+## 4. Các chức năng chính
 
-| Endpoint | Action | Log chính | Layer |
-|---|---|---|---|
-| `POST /api/auth/register` | Đăng ký | `event=register` → `app.log` | Application |
-| `POST /api/auth/login` | Đăng nhập | `LOGIN_SUCCESS`/`LOGIN_FAIL`/`ACCOUNT_LOCKED` → `auth.log`; `login_success`/`login_fail` → `app.log` | Authentication + Application |
-| `POST /api/auth/logout` | Đăng xuất | `LOGOUT` → `auth.log`; UPDATE `sessions.revoked_at` → Postgres log | Authentication + Database |
-| `GET/PUT /api/users/{id}` | Xem/sửa profile | `profile_read`/`profile_update`/`authorization_denied` → `app.log` | Application |
-| `POST /api/tasks` | Tạo task | `task_create` → `app.log`; INSERT → Postgres log | Application + Database |
-| `GET /api/tasks`, `GET /api/tasks/{id}` | Đọc task(s) | `task_read` → `app.log` (KHÔNG có gì ở Postgres log — SELECT không audit) | Application |
-| `PUT /api/tasks/{id}` | Sửa task | `task_update` (kèm `changed_fields`) → `app.log`; UPDATE → Postgres log | Application + Database |
-| `DELETE /api/tasks/{id}` | Xoá task | `task_delete` → `app.log`; DELETE → Postgres log | Application + Database |
-| Mọi request không hợp lệ | — | `validation_error` → `app.log`, HTTP 400 | Application |
-| `GET /api/debug/crash` | Gây exception | `unhandled_exception` (kèm stack trace) → `app.log`, HTTP 500 (client chỉ thấy `request_id`) | Application |
-| Mọi request | — | 1 dòng access log JSON (kèm `session_id` cookie) → `nginx access.log` | Reverse Proxy |
+| Endpoint | Chức năng |
+|---|---|
+| `POST /api/auth/register` | Đăng ký tài khoản |
+| `POST /api/auth/login` | Đăng nhập |
+| `POST /api/auth/logout` | Đăng xuất |
+| `GET/PUT /api/users/{id}` | Xem/sửa hồ sơ cá nhân |
+| `POST /api/tasks` | Tạo công việc |
+| `GET /api/tasks`, `GET /api/tasks/{id}` | Xem danh sách/chi tiết công việc |
+| `PUT /api/tasks/{id}` | Cập nhật công việc |
+| `DELETE /api/tasks/{id}` | Xoá công việc |
 
-## 5. Xem log — từng layer
+Chi tiết thiết kế API/màn hình đầy đủ ở
+[`PHAN_TICH_THIET_KE.md`](PHAN_TICH_THIET_KE.md).
+
+## 5. Xem log của ứng dụng
 
 ```powershell
 # Nginx (Reverse Proxy / Web layer)
@@ -98,16 +104,11 @@ Get-Content .\logs\app\auth.log -Tail 50 -Wait
 # PostgreSQL (Database layer) — chỉ có INSERT/UPDATE/DELETE (log_statement=mod)
 Get-Content .\logs\postgres\postgresql-<ngày>.log -Tail 50 -Wait
 
-# OS / Container layer (tương đương docker logs cho từng service)
+# Docker logging driver (tương đương stdout container)
 docker logs -f soclab-nginx
 docker logs -f soclab-backend
 docker logs -f soclab-db
 ```
-
-`docker logs soclab-backend` và `docker logs soclab-nginx` cho ra đúng nội
-dung với file trong `logs/` (stdout được ghi song song với file, theo yêu
-cầu của lab) — dùng cái nào tuỳ bạn muốn thực hành thu log qua Docker
-logging driver hay đọc file trực tiếp.
 
 Xem trực tiếp dữ liệu trong Postgres (không phải log, mà là data thật):
 ```powershell
@@ -115,139 +116,21 @@ docker compose exec db psql -U soclab -d soclab -c "\dt"
 docker compose exec db psql -U soclab -d soclab -c "SELECT * FROM tasks;"
 ```
 
-## 6. Walkthrough 10 kịch bản
+Phân tích chi tiết từng loại sự kiện log (đăng nhập, thao tác task,
+lỗi...) và ý nghĩa của chúng nằm ở
+[`LOGGING_MAP.md`](LOGGING_MAP.md) — tài liệu đó bao gồm cả bộ kịch bản
+thao tác mẫu để tự tay tạo ra các sự kiện log tương ứng.
 
-Giả sử `NGINX_PORT=8080`. Dùng `curl` với `-c cookies.txt -b cookies.txt`
-để giữ session giữa các lệnh (PowerShell: dùng `curl.exe`, không phải
-alias `Invoke-WebRequest`).
+## 6. Giới hạn phạm vi hiện tại
 
-**1. Truy cập web**
-```powershell
-curl.exe http://localhost:8080/index.html
-```
-→ xem: `logs/nginx/access.log` (1 dòng mới, status 200).
+- `SESSION_COOKIE_SECURE=false` trong `.env.example` chỉ phù hợp khi
+  chạy HTTP trên `localhost`. Bật lại `true` ngay khi có HTTPS.
+- Chưa có TLS, CI/CD, hay test coverage tự động.
+- `uvicorn` chạy đúng 1 worker (`--workers 1`) để logic đếm login-fail
+  và session (đọc/ghi trực tiếp Postgres, không cache) luôn nhất quán —
+  đây là lựa chọn đơn giản hoá, có thể mở rộng sau.
 
-**2. Đăng ký (đã có thể làm qua UI `/register.html`)**
-```powershell
-curl.exe -X POST http://localhost:8080/api/auth/register `
-  -H "Content-Type: application/json" `
-  -d '{"username":"dave","email":"dave@example.com","password":"Passw0rd!"}'
-```
-→ xem: `logs/app/app.log`, `event="register"`.
-
-**3. Login đúng**
-```powershell
-curl.exe -c cookies.txt -X POST http://localhost:8080/api/auth/login `
-  -H "Content-Type: application/json" `
-  -d '{"username":"alice","password":"Passw0rd!"}'
-```
-→ xem: `logs/app/auth.log` (`LOGIN_SUCCESS`), `logs/app/app.log`
-(`login_success`), `logs/nginx/access.log` (cookie `session_id` xuất
-hiện trong response `Set-Cookie`, và trong các request tiếp theo).
-
-**4. Login sai (5 lần liên tiếp để kích hoạt khoá)**
-```powershell
-1..5 | ForEach-Object {
-  curl.exe -X POST http://localhost:8080/api/auth/login `
-    -H "Content-Type: application/json" `
-    -d '{"username":"alice","password":"wrong"}'
-}
-```
-→ xem: `logs/app/auth.log` — 4 dòng `LOGIN_FAIL` (`reason=bad_password`),
-dòng thứ 5 có thêm `ACCOUNT_LOCKED`. Lần thử thứ 6 trở đi trong 5 phút
-tiếp theo sẽ nhận HTTP 429 và `LOGIN_FAIL` với `reason=account_locked`.
-
-**5. Logout**
-```powershell
-curl.exe -c cookies.txt -b cookies.txt -X POST http://localhost:8080/api/auth/logout
-```
-→ xem: `logs/app/auth.log` (`LOGOUT`), và trong Postgres log một dòng
-`UPDATE sessions SET revoked_at = ...` — bằng chứng session bị huỷ thật ở
-server chứ không chỉ xoá cookie.
-
-**6. Query (đọc dữ liệu)**
-```powershell
-curl.exe -b cookies.txt http://localhost:8080/api/tasks
-```
-→ xem: `logs/app/app.log` (`task_read`). Kiểm tra Postgres log cùng thời
-điểm — sẽ **không** có gì (SELECT không audit), đối lập với bước 7-9.
-
-**7. Create**
-```powershell
-curl.exe -b cookies.txt -X POST http://localhost:8080/api/tasks `
-  -H "Content-Type: application/json" `
-  -d '{"title":"Viết báo cáo tuần","priority":"high","status":"todo","due_date":"2026-08-25"}'
-```
-→ xem: `logs/app/app.log` (`task_create`) + Postgres log (`INSERT INTO
-tasks`). Lưu lại `id` trả về để dùng ở bước 8-9.
-
-**8. Update**
-```powershell
-curl.exe -b cookies.txt -X PUT http://localhost:8080/api/tasks/<task_id> `
-  -H "Content-Type: application/json" `
-  -d '{"status":"doing"}'
-```
-→ xem: `logs/app/app.log` (`task_update`, có `changed_fields` với
-old/new) + Postgres log (`UPDATE tasks`).
-
-**9. Delete**
-```powershell
-curl.exe -b cookies.txt -X DELETE http://localhost:8080/api/tasks/<task_id>
-```
-→ xem: `logs/app/app.log` (`task_delete`) + Postgres log (`DELETE FROM
-tasks`).
-
-**10. Request không hợp lệ + gây exception**
-```powershell
-# thiếu field bắt buộc -> 400
-curl.exe -X POST http://localhost:8080/api/auth/register `
-  -H "Content-Type: application/json" -d '{"username":"x"}'
-
-# gây lỗi 500 có chủ đích
-curl.exe http://localhost:8080/api/debug/crash
-```
-→ xem: `logs/app/app.log` — dòng đầu `event="validation_error"`, dòng
-sau `event="unhandled_exception"` kèm `stack_trace` đầy đủ. Response của
-lệnh `debug/crash` chỉ có `detail` chung chung + `request_id` — dùng
-`request_id` đó để `grep`/`Select-String` đúng dòng log tương ứng ở cả
-`app.log` lẫn `logs/nginx/access.log`.
-
-**Bonus — test IDOR** (điểm nhấn của lab):
-```powershell
-# Login bằng bob, thử đọc profile hoặc task của alice bằng ID của alice
-curl.exe -c bob.txt -b bob.txt -X POST http://localhost:8080/api/auth/login `
-  -H "Content-Type: application/json" -d '{"username":"bob","password":"Passw0rd!"}'
-
-curl.exe -b bob.txt http://localhost:8080/api/users/<alice_user_id>
-curl.exe -b bob.txt http://localhost:8080/api/tasks/<alice_task_id>
-```
-→ cả hai trả HTTP 403, và `logs/app/app.log` có `event=
-"authorization_denied"` với `owner_id != requester_id` — bằng chứng trực
-tiếp cho detection rule IDOR.
-
-## 7. Seed dữ liệu mẫu
-
-```powershell
-docker compose exec backend python -m app.seed
-```
-Tạo 3 user (`alice`, `bob`, `carol`, mật khẩu `Passw0rd!`) và vài task
-mẫu gắn với `alice`/`bob`. Script idempotent — chạy lại không tạo trùng
-user đã tồn tại.
-
-## 8. Ghi chú bảo mật cho lab này (đọc trước khi làm gì khác ngoài local)
-
-- `SESSION_COOKIE_SECURE=false` trong `.env.example` là **có chủ đích**,
-  chỉ vì lab chạy HTTP trên `localhost`. Bật lại `true` ngay khi có HTTPS.
-- Endpoint `GET /api/debug/crash` cố tình không cần auth và cố tình gây
-  lỗi — không bao giờ đưa endpoint kiểu này vào code thật.
-- Không có TLS, không có CI/CD, không có test coverage — đúng như phạm vi
-  yêu cầu (lab học logging/kiến trúc, không phải sản phẩm thật).
-- `uvicorn` chạy đúng 1 worker (`--workers 1`) để logic đếm login-fail và
-  session (đọc/ghi trực tiếp Postgres, không cache) nhất quán và dễ dò
-  log 1-1 với hành động — không phải giới hạn kỹ thuật, mà là lựa chọn
-  đơn giản hoá cho mục đích đào tạo.
-
-## 9. Troubleshooting nhanh
+## 7. Troubleshooting nhanh
 
 - Container `db` không lên "healthy": kiểm tra `logs/postgres/` có ghi
   được không — trên một số máy, quyền ghi bind-mount cho user `postgres`
@@ -257,4 +140,4 @@ user đã tồn tại.
   `docker compose up -d`.
 - Nếu vừa `git pull`/đổi code frontend mà trình duyệt vẫn hiện bản cũ:
   nhấn Ctrl+Shift+R để hard-refresh (trình duyệt cache file tĩnh theo
-  mặc định vì Nginx không set `Cache-Control` tường minh trong lab này).
+  mặc định vì Nginx không set `Cache-Control` tường minh).

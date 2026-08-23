@@ -24,9 +24,10 @@ DEMO_TASKS = {
     "alice": [
         {
             "title": "Chuẩn bị slide báo cáo tuần",
-            "description": "Tổng hợp tiến độ dự án SOC lab",
+            "description": "Tổng hợp tiến độ công việc trong tuần",
             "priority": "high",
             "status": "doing",
+            "category": "work",
             "due_date": TODAY + timedelta(days=2),
         },
         {
@@ -34,6 +35,7 @@ DEMO_TASKS = {
             "description": None,
             "priority": "low",
             "status": "todo",
+            "category": "study",
             "due_date": None,
         },
     ],
@@ -43,6 +45,7 @@ DEMO_TASKS = {
             "description": "Lỗi session hết hạn không revoke đúng",
             "priority": "medium",
             "status": "done",
+            "category": "work",
             "due_date": TODAY - timedelta(days=1),
         },
     ],
