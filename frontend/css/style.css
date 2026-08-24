@@ -219,6 +219,8 @@ button {
 }
 
 button:hover { background: var(--accent-hover); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+button:disabled:hover { background: var(--accent); }
 
 button.secondary {
   background: transparent;
@@ -418,6 +420,7 @@ tr:hover td { background: rgba(255, 255, 255, 0.02); }
   z-index: 100;
 }
 .modal-overlay.hidden { display: none; }
+.hidden { display: none !important; }
 
 .modal-card {
   width: 100%;

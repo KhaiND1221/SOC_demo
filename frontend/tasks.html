@@ -28,6 +28,22 @@
         <h1>Tasks</h1>
         <p class="subtitle">Quản lý và theo dõi công việc cần làm.</p>
       </div>
+      <button id="add-task-toggle-btn">+ Thêm việc</button>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Chưa làm</div>
+        <div class="stat-value" id="stat-todo">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Đang làm</div>
+        <div class="stat-value" id="stat-doing">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Hoàn thành</div>
+        <div class="stat-value" id="stat-done">0</div>
+      </div>
     </div>
 
     <div class="card">
@@ -53,7 +69,7 @@
       <p id="list-msg" class="message"></p>
     </div>
 
-    <div class="card">
+    <div class="card hidden" id="create-card">
       <h3 class="section-title">Tạo công việc mới</h3>
       <label for="c-title">Tiêu đề</label>
       <input id="c-title" type="text" />
@@ -118,6 +134,12 @@
         return;
       }
 
+      const counts = { todo: 0, doing: 0, done: 0 };
+      res.data.forEach((t) => { counts[t.status] = (counts[t.status] || 0) + 1; });
+      document.getElementById("stat-todo").textContent = counts.todo;
+      document.getElementById("stat-doing").textContent = counts.doing;
+      document.getElementById("stat-done").textContent = counts.done;
+
       body.innerHTML = "";
       res.data.forEach((t) => {
         const tr = document.createElement("tr");
@@ -147,6 +169,10 @@
 
     document.getElementById("refresh-btn").addEventListener("click", loadTasks);
     document.getElementById("filter-category").addEventListener("change", loadTasks);
+
+    document.getElementById("add-task-toggle-btn").addEventListener("click", () => {
+      document.getElementById("create-card").classList.toggle("hidden");
+    });
 
     function openDetailModal(t) {
       document.getElementById("detail-title").textContent = t.title;
@@ -199,21 +225,43 @@
     });
 
     document.getElementById("create-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("create-btn");
       const msgEl = document.getElementById("create-msg");
-      const due = document.getElementById("c-due").value;
-      const res = await apiFetch("/tasks", {
-        method: "POST",
-        body: JSON.stringify({
-          title: document.getElementById("c-title").value.trim(),
-          description: document.getElementById("c-description").value.trim() || null,
-          priority: document.getElementById("c-priority").value,
-          status: document.getElementById("c-status").value,
-          category: document.getElementById("c-category").value.trim() || null,
-          due_date: due || null,
-        }),
-      });
-      showMessage(msgEl, res.ok ? "Task created." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
-      if (res.ok) loadTasks();
+
+      // Prevent duplicate tasks from a double-click or an impatient
+      // second click while the first request is still in flight.
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = "Đang thêm...";
+
+      try {
+        const due = document.getElementById("c-due").value;
+        const res = await apiFetch("/tasks", {
+          method: "POST",
+          body: JSON.stringify({
+            title: document.getElementById("c-title").value.trim(),
+            description: document.getElementById("c-description").value.trim() || null,
+            priority: document.getElementById("c-priority").value,
+            status: document.getElementById("c-status").value,
+            category: document.getElementById("c-category").value.trim() || null,
+            due_date: due || null,
+          }),
+        });
+        showMessage(msgEl, res.ok ? "Đã tạo công việc." : `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, !res.ok);
+        if (res.ok) {
+          document.getElementById("c-title").value = "";
+          document.getElementById("c-description").value = "";
+          document.getElementById("c-category").value = "";
+          document.getElementById("c-due").value = "";
+          document.getElementById("c-priority").value = "medium";
+          document.getElementById("c-status").value = "todo";
+          loadTasks();
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
     });
 
     loadTasks();
