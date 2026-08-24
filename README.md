@@ -126,11 +126,40 @@ lỗi...) và ý nghĩa của chúng nằm ở
 [`LOGGING_MAP.md`](LOGGING_MAP.md) — tài liệu đó bao gồm cả bộ kịch bản
 thao tác mẫu để tự tay tạo ra các sự kiện log tương ứng.
 
+## 5b. HTTPS (self-signed, cho demo)
+
+Nginx nghe cả `NGINX_PORT` (HTTP, mặc định 8080) và `NGINX_HTTPS_PORT`
+(HTTPS, mặc định 8443), dùng chứng chỉ self-signed tại `nginx/ssl/`.
+
+```powershell
+# https://localhost:8443 — trình duyệt sẽ báo "Not secure"/"chưa tin cậy"
+# vì đây là cert tự ký, không phải từ CA công cộng. Bấm "Advanced" ->
+# "Proceed to localhost (unsafe)" để tiếp tục — đây là hành vi đúng
+# với self-signed cert, không phải lỗi.
+```
+
+Nếu cần tạo lại cert (vd hết hạn sau 825 ngày, hoặc muốn đổi CN):
+```powershell
+docker run --rm -v "${PWD}/nginx/ssl:/certs" alpine sh -c "apk add --no-cache openssl >/dev/null 2>&1 && openssl req -x509 -nodes -days 825 -newkey rsa:2048 -keyout /certs/selfsigned.key -out /certs/selfsigned.crt -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'"
+docker compose restart nginx
+```
+
+File `.key`/`.crt` **không được commit vào git** (đã có trong
+`.gitignore`) — mỗi máy tự generate cert riêng, đây là thực hành chuẩn
+cho private key dù chỉ là self-signed cho lab.
+
+`SESSION_COOKIE_SECURE` vẫn để `false` mặc định vì port HTTP (8080) vẫn
+đang mở song song — nếu muốn test đúng hành vi "production" (cookie chỉ
+gửi qua HTTPS), đổi `SESSION_COOKIE_SECURE=true` trong `.env`, chạy lại
+`docker compose up -d backend`, và chỉ truy cập qua `https://localhost:8443`
+từ lúc đó (cookie sẽ không được gửi nếu bạn quay lại dùng cổng HTTP).
+
 ## 6. Giới hạn phạm vi hiện tại
 
-- `SESSION_COOKIE_SECURE=false` trong `.env.example` chỉ phù hợp khi
-  chạy HTTP trên `localhost`. Bật lại `true` ngay khi có HTTPS.
-- Chưa có TLS, CI/CD, hay test coverage tự động.
+- Có HTTPS (self-signed, xem mục 5b) nhưng port HTTP vẫn mở song song
+  theo mặc định — muốn ép buộc chỉ dùng HTTPS thì tự đổi
+  `SESSION_COOKIE_SECURE=true` như hướng dẫn ở mục 5b.
+- Chưa có CI/CD hay test coverage tự động.
 - `uvicorn` chạy đúng 1 worker (`--workers 1`) để logic đếm login-fail
   và session (đọc/ghi trực tiếp Postgres, không cache) luôn nhất quán —
   đây là lựa chọn đơn giản hoá, có thể mở rộng sau.
