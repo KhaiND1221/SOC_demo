@@ -98,11 +98,33 @@ Chuyển sang cửa sổ `watch-logs.ps1`. Từng bước dưới đây: **làm 
 - Đối chiếu lớp thấp: `[DB] UPDATE tasks` — xác nhận Postgres cũng nhận
   đúng giá trị mới đó (`SET status='doing'`), khớp với `new` ở app.log.
 
-### 2.4. Đăng nhập sai 5 lần liên tiếp (khoá tạm thời)
+> **Lưu ý thứ tự — đọc trước khi quay:** cơ chế khoá tài khoản kiểm tra
+> theo **username HOẶC IP** (xem `backend/app/routers/auth.py`). Toàn bộ
+> traffic demo đều xuất phát từ cùng 1 máy → cùng 1 IP. Nếu làm bước
+> "login sai 5 lần" (2.5) TRƯỚC bước IDOR (2.4), IP sẽ bị khoá 5 phút và
+> tài khoản B ở bước 2.4 **không login được nữa** dù mật khẩu đúng (nhận
+> 429 thay vì 200) — đã tự kiểm chứng lỗi này khi test thử. Vì vậy thứ tự
+> bên dưới **bắt buộc theo đúng số** (2.4 trước 2.5), không đảo được.
+> Đây cũng là điểm hay để nói trong video: khoá theo IP-OR-username nghĩa
+> là 1 IP bị khoá sẽ ảnh hưởng đến MỌI tài khoản đăng nhập từ IP đó, kể
+> cả tài khoản chưa từng đăng nhập sai lần nào.
+
+### 2.4. Truy cập trái phép (IDOR) — làm trước bước khoá tài khoản
+- Hành động: đăng nhập bằng tài khoản B (`bob`), thử `GET
+  /api/tasks/<id của task tài khoản A (`alice`)>`.
+- Bóc field: `[APP] authorization_denied` — đọc `resource`,
+  `resource_id`, `owner_id`, `requester_id` — chỉ rõ `owner_id !=
+  requester_id` bằng mắt.
+- Đối chiếu lớp thấp: **không có** dòng `[DB]` nào tương ứng xuất hiện —
+  đây chính là bằng chứng request bị chặn *trước khi* chạm tới database,
+  không phải app chỉ "ẩn" kết quả sau khi đã đọc dữ liệu.
+
+### 2.5. Đăng nhập sai 5 lần liên tiếp (khoá tạm thời) — làm SAU CÙNG
+Làm bước này sau bước 2.4, vì nó khoá IP 5 phút (xem lưu ý ở trên).
 ```powershell
 1..5 | ForEach-Object {
   curl.exe -X POST http://localhost:8080/api/auth/login `
-    -H "Content-Type: application/json" -d '{"username":"alice","password":"wrong"}'
+    -H "Content-Type: application/json" -d '{"username":"carol","password":"wrong"}'
 }
 ```
 - Bóc field: 4 dòng `[AUTH] LOGIN_FAIL` (`reason=bad_password`,
@@ -111,16 +133,6 @@ Chuyển sang cửa sổ `watch-logs.ps1`. Từng bước dưới đây: **làm 
 - Đối chiếu lớp thấp: `[DB] INSERT login_attempts` — mỗi lần thử đều có
   1 dòng ghi `success=false` tương ứng trong Postgres, không chỉ là log
   ứng dụng "nói suông" — số dòng `INSERT` phải đúng bằng số lần login sai.
-
-### 2.5. Truy cập trái phép (IDOR)
-- Hành động: đăng nhập bằng tài khoản B, thử `GET /api/tasks/<id của
-  task tài khoản A>`.
-- Bóc field: `[APP] authorization_denied` — đọc `resource`,
-  `resource_id`, `owner_id`, `requester_id` — chỉ rõ `owner_id !=
-  requester_id` bằng mắt.
-- Đối chiếu lớp thấp: **không có** dòng `[DB]` nào tương ứng xuất hiện —
-  đây chính là bằng chứng request bị chặn *trước khi* chạm tới database,
-  không phải app chỉ "ẩn" kết quả sau khi đã đọc dữ liệu.
 
 ### 2.6. Phát sinh exception (lỗi 500)
 ```powershell
