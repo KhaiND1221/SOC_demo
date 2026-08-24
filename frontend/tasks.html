@@ -236,11 +236,31 @@
       btn.textContent = "Đang thêm...";
 
       try {
+        const title = document.getElementById("c-title").value.trim();
+
+        // Duplicate-title check: ask for confirmation before creating a
+        // task whose title already exists, instead of silently allowing
+        // it. Always re-fetches the full (unfiltered) list so the check
+        // is accurate even when a category filter is active on screen.
+        const existingRes = await apiFetch("/tasks");
+        if (existingRes.ok) {
+          const isDuplicate = existingRes.data.some(
+            (t) => t.title.trim().toLowerCase() === title.toLowerCase()
+          );
+          if (isDuplicate) {
+            const proceed = confirm(`Đã có công việc tên "${title}". Bạn vẫn muốn tạo thêm một cái trùng tên?`);
+            if (!proceed) {
+              showMessage(msgEl, "Đã huỷ - trùng tên với công việc đã có.", true);
+              return;
+            }
+          }
+        }
+
         const due = document.getElementById("c-due").value;
         const res = await apiFetch("/tasks", {
           method: "POST",
           body: JSON.stringify({
-            title: document.getElementById("c-title").value.trim(),
+            title,
             description: document.getElementById("c-description").value.trim() || null,
             priority: document.getElementById("c-priority").value,
             status: document.getElementById("c-status").value,
