@@ -8,7 +8,7 @@ from app.database import Base, engine, wait_for_db
 from app.logging_config import app_logger, log_event
 from app.middleware import RequestContextMiddleware
 from app.request_context import request_id_var
-from app.routers import auth, profile, tasks
+from app.routers import auth, debug, profile, tasks
 
 app = FastAPI(title="Task Manager API")
 
@@ -17,6 +17,7 @@ app.add_middleware(RequestContextMiddleware)
 app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(tasks.router)
+app.include_router(debug.router)
 
 
 @app.on_event("startup")

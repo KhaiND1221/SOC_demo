@@ -19,6 +19,10 @@ Tài liệu vận hành & nâng cấp mã nguồn (thêm tính năng mới vào 
 đang chạy, migration DB, các vấn đề cần quan tâm) nằm ở
 [`VAN_HANH_NANG_CAP.md`](VAN_HANH_NANG_CAP.md).
 
+Kịch bản quay video demo (từng bước thao tác + đối chiếu log đúng
+phương pháp: bóc field + xác thực bằng bằng chứng ở layer thấp hơn) nằm
+ở [`KICH_BAN_DEMO.md`](KICH_BAN_DEMO.md).
+
 ## 1. Cấu trúc thư mục
 
 ```
@@ -86,6 +90,7 @@ volume DB).
 | `GET /api/tasks`, `GET /api/tasks/{id}` | Xem danh sách/chi tiết công việc |
 | `PUT /api/tasks/{id}` | Cập nhật công việc |
 | `DELETE /api/tasks/{id}` | Xoá công việc |
+| `GET /api/debug/crash` | **Chỉ phục vụ demo/quay video** — cố tình gây lỗi 500 để minh hoạ kịch bản "phát sinh exception" (xem `KICH_BAN_DEMO.md` bước 2.6). Không phải chức năng nghiệp vụ thật. |
 
 Chi tiết thiết kế API/màn hình đầy đủ ở
 [`PHAN_TICH_THIET_KE.md`](PHAN_TICH_THIET_KE.md).
