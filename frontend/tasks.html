@@ -69,6 +69,15 @@
       <p id="list-msg" class="message"></p>
     </div>
 
+    <div class="card">
+      <h3 class="section-title">Tra cứu theo ID (test truy cập trái phép / IDOR)</h3>
+      <p class="muted">Dán ID của 1 task (kể cả task không phải của bạn) để thử xem — dùng để kiểm tra authorization: chỉ chủ sở hữu mới được xem, người khác sẽ nhận lỗi 403.</p>
+      <label for="lookup-id">Task ID</label>
+      <input id="lookup-id" type="text" placeholder="vd: 6d137c2e-d870-430d-960c-854428acf066" />
+      <button id="lookup-btn" class="secondary">Xem theo ID</button>
+      <p id="lookup-msg" class="message"></p>
+    </div>
+
     <div class="card hidden" id="create-card">
       <h3 class="section-title">Tạo công việc mới</h3>
       <label for="c-title">Tiêu đề</label>
@@ -174,9 +183,25 @@
       document.getElementById("create-card").classList.toggle("hidden");
     });
 
+    document.getElementById("lookup-btn").addEventListener("click", async () => {
+      const msgEl = document.getElementById("lookup-msg");
+      const id = document.getElementById("lookup-id").value.trim();
+      if (!id) { showMessage(msgEl, "Nhập ID trước đã.", true); return; }
+
+      const res = await apiFetch(`/tasks/${id}`);
+      if (res.ok) {
+        showMessage(msgEl, "Truy cập được — bạn là chủ sở hữu task này.");
+        openDetailModal(res.data);
+      } else {
+        showMessage(msgEl, `HTTP ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, true);
+      }
+    });
+
     function openDetailModal(t) {
       document.getElementById("detail-title").textContent = t.title;
       document.getElementById("detail-body").innerHTML = `
+        <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value" style="user-select:all;">${t.id}</span></div>
+        <div class="detail-row"><span class="detail-label">Chủ sở hữu (user_id)</span><span class="detail-value" style="user-select:all;">${t.user_id}</span></div>
         <div class="detail-row"><span class="detail-label">Mô tả</span><span class="detail-value">${t.description || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Ưu tiên</span><span class="detail-value"><span class="badge badge-priority-${t.priority}">${PRIORITY_LABEL[t.priority] || t.priority}</span></span></div>
         <div class="detail-row"><span class="detail-label">Trạng thái</span><span class="detail-value">${STATUS_LABEL[t.status] || t.status}</span></div>
