@@ -72,6 +72,11 @@ function Format-NginxLog {
         "^5" { "Red" }
         default { "White" }
     }
+    # Older log lines (before the "scheme" field was added) come back as
+    # $null here -- fall back to a placeholder instead of erroring.
+    $schemeLabel = if ($o.scheme) { $o.scheme.ToUpper() } else { "?" }
+    $schemeColor = if ($o.scheme -eq "https") { "Green" } else { "DarkYellow" }
+    Write-Host -NoNewline ("[{0}] " -f $schemeLabel) -ForegroundColor $schemeColor
     Write-Host -NoNewline ("{0,-6} " -f $o.request_method) -ForegroundColor White
     Write-Host -NoNewline ("{0,-40} " -f $o.uri) -ForegroundColor Gray
     Write-Host -NoNewline "$($o.status) " -ForegroundColor $statusColor
