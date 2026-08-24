@@ -50,10 +50,16 @@ tích/thiết kế ở `PHAN_TICH_THIET_KE.md` (có thể lướt qua ERD 1 lầ
 - Đăng nhập ở `/login.html` → tự chuyển về trang chủ.
 
 **1.3. Quản lý task (CRUD + category)**
-- Vào `/tasks.html`: tạo 2–3 task, gắn category khác nhau (vd `work`,
-  `study`).
-- Lọc theo category → chỉ hiện đúng task thuộc nhãn đó.
-- Sửa trạng thái 1 task (`todo` → `doing`).
+- Vào `/tasks.html`: chỉ ra 3 ô đếm Chưa làm/Đang làm/Hoàn thành ở đầu
+  trang (tự cập nhật theo danh sách hiện có).
+- Bấm nút **"+ Thêm việc"** để mở form tạo task (form mặc định đang ẩn).
+- Tạo 2–3 task, gắn category khác nhau (vd `work`, `study`).
+- Thử tạo 1 task **trùng tiêu đề** với task vừa tạo → chỉ ra hộp thoại
+  cảnh báo hiện ra trước khi cho tạo (tính năng chống nhầm lẫn).
+- Lọc theo category → chỉ hiện đúng task thuộc nhãn đó, đồng thời 3 ô
+  đếm ở trên cũng đổi theo đúng bộ lọc.
+- Sửa trạng thái 1 task (`todo` → `doing`) ngay trên dropdown ở bảng.
+- Bấm "Xem" để mở modal chi tiết task.
 - Xoá 1 task.
 
 **1.4. Hồ sơ cá nhân**
