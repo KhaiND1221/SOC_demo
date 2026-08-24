@@ -1,5 +1,9 @@
 # Task Manager
 
+> **Làm việc trên nhiều máy (công ty/nhà)?** Đọc
+> [`BAN_GIAO.md`](BAN_GIAO.md) trước — tóm tắt trạng thái dự án, việc đã
+> làm gần nhất, và lưu ý quan trọng để không lặp lại lỗi cũ.
+
 Ứng dụng web quản lý công việc cá nhân: mỗi người dùng đăng ký tài
 khoản riêng, tự tạo/xem/sửa/xoá danh sách công việc cần làm của mình
 (tiêu đề, mô tả, độ ưu tiên, trạng thái, hạn hoàn thành).
