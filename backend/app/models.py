@@ -55,8 +55,24 @@ class Task(Base):
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     user = relationship("User", back_populates="tasks")
+    # passive_deletes=True: let Postgres's own ON DELETE CASCADE (on
+    # TaskComment.task_id below) handle deleting child comments, instead
+    # of SQLAlchemy loading the collection and issuing its own per-row
+    # DELETE statements. Without this, the two cascade mechanisms (ORM
+    # cascade="delete-orphan" here + DB-level ON DELETE CASCADE) fight
+    # over the same job non-deterministically - whether SQLAlchemy's
+    # cascade fires an explicit DELETE depends on whether `comments` was
+    # already loaded into the session, which varies request to request.
+    # That showed up as Postgres's audit log sometimes containing a
+    # separate "DELETE FROM task_comments" line and sometimes not, for
+    # the exact same code path - not something a log analyst should have
+    # to tolerate. One consistent mechanism, always.
     comments = relationship(
-        "TaskComment", back_populates="task", cascade="all, delete-orphan", order_by="TaskComment.created_at"
+        "TaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="TaskComment.created_at",
     )
 
 
