@@ -12,7 +12,17 @@ from app.models import User
 from app.request_context import session_id_var, user_id_var
 
 
-def get_current_user(request: Request, db: DBSession = Depends(get_db)) -> User:
+async def get_current_user(request: Request, db: DBSession = Depends(get_db)) -> User:
+    # Deliberately `async def`, not `def`. FastAPI runs sync dependencies
+    # in a worker-thread pool (via anyio.to_thread.run_sync), which copies
+    # the current contextvars INTO the thread - so contextvar.set() calls
+    # made in there never propagate back out to the request's real context.
+    # That silently broke session_id_var here specifically (user_id_var
+    # happened to "work" only because callers also pass user_id explicitly
+    # from the returned User object - session_id has no such fallback).
+    # Making this async keeps it on the same context as the rest of the
+    # request, so the .set() below actually sticks. Same root cause as the
+    # request_id fix in middleware.py, just on the write side this time.
     raw_session_id = request.cookies.get(settings.session_cookie_name)
 
     if not raw_session_id:

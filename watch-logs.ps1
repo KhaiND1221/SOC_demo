@@ -54,14 +54,18 @@ function Format-JsonLog {
     $ts = try { ([datetimeoffset]$o.timestamp).UtcDateTime.ToString("HH:mm:ss") } catch { "--:--:--" }
     $rid = if ($o.request_id) { $o.request_id.ToString().Substring(0, [Math]::Min(8, $o.request_id.ToString().Length)) } else { "-" }
     $uid = if ($o.user_id) { $o.user_id.ToString().Substring(0, [Math]::Min(8, $o.user_id.ToString().Length)) } else { "-" }
-    $sid = if ($o.session_id) { $o.session_id.ToString().Substring(0, [Math]::Min(8, $o.session_id.ToString().Length)) } else { "-" }
 
+    # No session_id column here (unlike the Nginx formatter below): it's
+    # only reliably populated on event-specific log lines (task_read,
+    # login_success, ...), not on the generic "http_request" line emitted
+    # by the middleware - showing "sess=-" there every time was more
+    # confusing than useful. Cross-reference via req= against the
+    # event-specific line for the same request instead.
     Write-Host -NoNewline "$ts " -ForegroundColor DarkGray
     Write-Host -NoNewline ("{0,-7}" -f $o.level) -ForegroundColor $levelColor
     Write-Host -NoNewline " $($o.event)" -ForegroundColor White
     Write-Host -NoNewline "  req=$rid" -ForegroundColor Blue
     Write-Host -NoNewline "  user=$uid" -ForegroundColor DarkCyan
-    Write-Host -NoNewline "  sess=$sid" -ForegroundColor DarkMagenta
     Write-Host -NoNewline "  result=$($o.result)" -ForegroundColor $(if ($o.result -eq "fail") { "Red" } else { "DarkGreen" })
     Write-Host "  $($o.message)" -ForegroundColor Gray
 }
