@@ -132,10 +132,14 @@ lỗi...) và ý nghĩa của chúng nằm ở
 [`LOGGING_MAP.md`](LOGGING_MAP.md) — tài liệu đó bao gồm cả bộ kịch bản
 thao tác mẫu để tự tay tạo ra các sự kiện log tương ứng.
 
-## 5b. HTTPS (self-signed, cho demo)
+## 5b. HTTPS (self-signed, bắt buộc — HTTP tự động redirect sang HTTPS)
 
-Nginx nghe cả `NGINX_PORT` (HTTP, mặc định 8080) và `NGINX_HTTPS_PORT`
-(HTTPS, mặc định 8443), dùng chứng chỉ self-signed tại `nginx/ssl/`.
+Nginx nghe `NGINX_PORT` (HTTP, mặc định 8080) và `NGINX_HTTPS_PORT`
+(HTTPS, mặc định 8443, chứng chỉ self-signed tại `nginx/ssl/`). Cổng
+HTTP **không phục vụ nội dung** — mọi request vào `NGINX_PORT` đều nhận
+`301 redirect` sang `https://localhost:NGINX_HTTPS_PORT` (xem 2 `server{}`
+block trong `nginx/nginx.conf`). Vào thẳng `http://localhost:8080` vẫn
+được, trình duyệt sẽ tự nhảy sang HTTPS.
 
 ```powershell
 # https://localhost:8443 — trình duyệt sẽ báo "Not secure"/"chưa tin cậy"
@@ -154,17 +158,25 @@ File `.key`/`.crt` **không được commit vào git** (đã có trong
 `.gitignore`) — mỗi máy tự generate cert riêng, đây là thực hành chuẩn
 cho private key dù chỉ là self-signed cho lab.
 
-`SESSION_COOKIE_SECURE` vẫn để `false` mặc định vì port HTTP (8080) vẫn
-đang mở song song — nếu muốn test đúng hành vi "production" (cookie chỉ
-gửi qua HTTPS), đổi `SESSION_COOKIE_SECURE=true` trong `.env`, chạy lại
-`docker compose up -d backend`, và chỉ truy cập qua `https://localhost:8443`
-từ lúc đó (cookie sẽ không được gửi nếu bạn quay lại dùng cổng HTTP).
+**`SESSION_COOKIE_SECURE=true` theo mặc định** (khác giai đoạn đầu của
+lab) — vì HTTP giờ chỉ redirect chứ không phục vụ gì, nên yêu cầu cookie
+chỉ gửi qua HTTPS là an toàn, không có tình huống nào cookie bị "kẹt"
+không gửi được. Nếu bạn tắt redirect (đổi `nginx.conf` để port 80 phục
+vụ nội dung lại như cũ), phải đổi `SESSION_COOKIE_SECURE=false` lại,
+nếu không cookie sẽ không được gửi khi truy cập qua HTTP.
+
+**Lưu ý cho `nginx.conf`**: dòng redirect hiện `return 301
+https://$host:8443$request_uri;` **hardcode cổng `8443`** — vì đây chỉ
+là file cấu hình tĩnh, không tự đọc được biến `NGINX_HTTPS_PORT` từ
+`.env`. Nếu bạn đổi `NGINX_HTTPS_PORT` trong `.env`, phải sửa tay số
+`8443` này trong `nginx/nginx.conf` cho khớp.
 
 ## 6. Giới hạn phạm vi hiện tại
 
-- Có HTTPS (self-signed, xem mục 5b) nhưng port HTTP vẫn mở song song
-  theo mặc định — muốn ép buộc chỉ dùng HTTPS thì tự đổi
-  `SESSION_COOKIE_SECURE=true` như hướng dẫn ở mục 5b.
+- Có HTTPS (self-signed, xem mục 5b) — HTTP tự động redirect sang
+  HTTPS, `SESSION_COOKIE_SECURE=true` mặc định. Cert tự ký nên trình
+  duyệt vẫn báo "Not secure" (không có ổ khoá xanh), khác với cert thật
+  từ CA công nhận khi triển khai production.
 - Chưa có CI/CD hay test coverage tự động.
 - `uvicorn` chạy đúng 1 worker (`--workers 1`) để logic đếm login-fail
   và session (đọc/ghi trực tiếp Postgres, không cache) luôn nhất quán —
