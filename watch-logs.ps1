@@ -53,11 +53,13 @@ function Format-JsonLog {
     }
     $ts = try { ([datetimeoffset]$o.timestamp).UtcDateTime.ToString("HH:mm:ss") } catch { "--:--:--" }
     $uid = if ($o.user_id) { $o.user_id.ToString().Substring(0, [Math]::Min(8, $o.user_id.ToString().Length)) } else { "-" }
+    $sid = if ($o.session_id) { $o.session_id.ToString().Substring(0, [Math]::Min(8, $o.session_id.ToString().Length)) } else { "-" }
 
     Write-Host -NoNewline "$ts " -ForegroundColor DarkGray
     Write-Host -NoNewline ("{0,-7}" -f $o.level) -ForegroundColor $levelColor
     Write-Host -NoNewline " $($o.event)" -ForegroundColor White
     Write-Host -NoNewline "  user=$uid" -ForegroundColor DarkCyan
+    Write-Host -NoNewline "  sess=$sid" -ForegroundColor DarkMagenta
     Write-Host -NoNewline "  result=$($o.result)" -ForegroundColor $(if ($o.result -eq "fail") { "Red" } else { "DarkGreen" })
     Write-Host "  $($o.message)" -ForegroundColor Gray
 }
@@ -81,7 +83,9 @@ function Format-NginxLog {
     Write-Host -NoNewline ("{0,-6} " -f $o.request_method) -ForegroundColor White
     Write-Host -NoNewline ("{0,-40} " -f $o.uri) -ForegroundColor Gray
     Write-Host -NoNewline "$($o.status) " -ForegroundColor $statusColor
-    Write-Host "from $($o.remote_addr)" -ForegroundColor DarkGray
+    Write-Host -NoNewline "from $($o.remote_addr)" -ForegroundColor DarkGray
+    $sid = if ($o.session_id) { $o.session_id.ToString().Substring(0, [Math]::Min(8, $o.session_id.ToString().Length)) } else { "-" }
+    Write-Host "  sess=$sid" -ForegroundColor DarkMagenta
 }
 
 function Format-NginxErrLog {
