@@ -123,8 +123,18 @@ function Format-DbLog {
             "DELETE" { "Red" }
             default  { "Yellow" }
         }
+        # First UUID anywhere in the line is the row's id - in the VALUES(...)
+        # list for INSERT/UPDATE, or in the WHERE clause for DELETE. Showing
+        # it (truncated) lets you eyeball-match this row against the
+        # task_id/comment_id/etc. in the [APP] line for the same action,
+        # without needing to grep the raw file.
+        $rowId = if ($Line -match '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}') {
+            $Matches[0].Substring(0, 8)
+        } else { "-" }
+
         Write-Host -NoNewline ("{0,-8} " -f $verb) -ForegroundColor $verbColor
-        Write-Host ("{0,-20}" -f $table) -ForegroundColor Gray
+        Write-Host -NoNewline ("{0,-16} " -f $table) -ForegroundColor Gray
+        Write-Host "id=$rowId" -ForegroundColor DarkYellow
     } else {
         # Non-DML lines (connection/checkpoint/startup messages, etc.)
         Write-Host $Line -ForegroundColor DarkGray
