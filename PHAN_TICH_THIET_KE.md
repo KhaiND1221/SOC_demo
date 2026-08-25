@@ -73,9 +73,11 @@ server (bảng `sessions`) — cho phép huỷ session tức thời bất cứ l
 **Cookie** (`session_id`, set trong `backend/app/routers/auth.py`):
 - `HttpOnly`: JavaScript phía client không đọc được cookie này → giảm
   rủi ro bị đánh cắp qua XSS.
-- `Secure`: cookie chỉ được trình duyệt gửi qua kết nối HTTPS. Trong
-  môi trường dev đang tắt (`SESSION_COOKIE_SECURE=false`) vì chạy HTTP
-  trên localhost — phải bật lại khi có HTTPS thật (xem README mục 3, 6).
+- `Secure`: cookie chỉ được trình duyệt gửi qua kết nối HTTPS. Ứng dụng
+  đã hỗ trợ HTTPS (self-signed, xem README mục 5b) nhưng mặc định vẫn để
+  `SESSION_COOKIE_SECURE=false` vì port HTTP vẫn mở song song cho tiện
+  demo — nếu muốn ép buộc chỉ dùng HTTPS thì bật `true` và chỉ truy cập
+  qua `https://` từ lúc đó (xem README mục 5b, 6).
 - `SameSite=Strict`: cookie không được gửi kèm khi request bắt nguồn từ
   site khác → giảm rủi ro CSRF.
 

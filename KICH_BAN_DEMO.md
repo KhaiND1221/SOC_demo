@@ -22,7 +22,7 @@ chứng log, phải làm đủ 3 việc, theo đúng thứ tự:
 ## 0. Chuẩn bị trước khi quay (không quay phần này)
 
 ```powershell
-cd C:\Users\ANM-KHAIND8\soc-logging-lab
+cd C:\Users\khain\SOC_demo
 docker compose ps                      # cả 3 container phải Up/healthy
 ```
 
