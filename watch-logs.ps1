@@ -19,10 +19,11 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $Sources = [ordered]@{
-    "NGINX" = @{ Path = Join-Path $ProjectDir "logs\nginx\access.log"; Color = "Cyan";    Kind = "nginx" }
-    "APP"   = @{ Path = Join-Path $ProjectDir "logs\app\app.log";      Color = "White";   Kind = "json" }
-    "AUTH"  = @{ Path = Join-Path $ProjectDir "logs\app\auth.log";     Color = "Magenta"; Kind = "json" }
-    "DB"    = @{ Path = $null;                                        Color = "Yellow";  Kind = "text" }
+    "NGINX"     = @{ Path = Join-Path $ProjectDir "logs\nginx\access.log"; Color = "Cyan";    Kind = "nginx" }
+    "NGINX-ERR" = @{ Path = Join-Path $ProjectDir "logs\nginx\error.log";  Color = "Red";     Kind = "nginxerr" }
+    "APP"       = @{ Path = Join-Path $ProjectDir "logs\app\app.log";     Color = "White";   Kind = "json" }
+    "AUTH"      = @{ Path = Join-Path $ProjectDir "logs\app\auth.log";    Color = "Magenta"; Kind = "json" }
+    "DB"        = @{ Path = $null;                                       Color = "Yellow";  Kind = "text" }
 }
 
 function Get-LatestPgLogPath {
@@ -83,6 +84,18 @@ function Format-NginxLog {
     Write-Host "from $($o.remote_addr)" -ForegroundColor DarkGray
 }
 
+function Format-NginxErrLog {
+    param([string]$Line)
+
+    # Nginx error_log format: "2026/08/24 12:00:00 [level] pid#tid: message"
+    $levelColor = switch -Regex ($Line) {
+        '\[emerg\]|\[alert\]|\[crit\]|\[error\]' { "Red" }
+        '\[warn\]'                                { "Yellow" }
+        default                                   { "Gray" }
+    }
+    Write-Host $Line -ForegroundColor $levelColor
+}
+
 function Format-DbLog {
     param([string]$Line)
 
@@ -110,9 +123,10 @@ function Write-LogLine {
     param([string]$Key, [hashtable]$Src, [string]$Line)
     Write-Tag -Text $Key -Color $Src.Color
     switch ($Src.Kind) {
-        "json"  { Format-JsonLog -Line $Line }
-        "nginx" { Format-NginxLog -Line $Line }
-        "text"  { Format-DbLog -Line $Line }
+        "json"     { Format-JsonLog -Line $Line }
+        "nginx"    { Format-NginxLog -Line $Line }
+        "nginxerr" { Format-NginxErrLog -Line $Line }
+        "text"     { Format-DbLog -Line $Line }
     }
 }
 
@@ -130,6 +144,15 @@ function Get-LineTimestamp {
             # timestamps and break the merge-sort below.
             "json"  { return ([datetimeoffset]($Line | ConvertFrom-Json).timestamp).UtcDateTime }
             "nginx" { return ([datetimeoffset]($Line | ConvertFrom-Json).time).UtcDateTime }
+            "nginxerr" {
+                # "2026/08/24 12:00:00 [error] ..." - Nginx logs this in the
+                # container's local time (UTC, since the image has no TZ
+                # set), same as the DB source, so no offset conversion here.
+                if ($Line -match '^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}') {
+                    return [datetime]::ParseExact($Matches[0], "yyyy/MM/dd HH:mm:ss", $null)
+                }
+                return [datetime]::MinValue
+            }
             "text"  {
                 if ($Line -match '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ UTC') {
                     return [datetime]::ParseExact($Matches[0], "yyyy-MM-dd HH:mm:ss.fff 'UTC'", $null)
