@@ -193,6 +193,28 @@ và `backend/app/models.py::TaskComment.task_id`). Lý do:
 nhận quyết định phê duyệt), lựa chọn đúng sẽ ngược lại — giữ orphan
 hoặc RESTRICT để không mất bằng chứng.*
 
+**Lỗi thật đã gặp và fix trong lúc kiểm thử — 2 cơ chế cascade tranh
+nhau:** Model ban đầu khai báo cascade ở **cả 2 tầng cùng lúc**: DB
+(`ON DELETE CASCADE`) **và** SQLAlchemy ORM
+(`cascade="all, delete-orphan"` trên `Task.comments`). Hậu quả: khi xoá
+task, log Postgres **có lúc** xuất hiện thêm 1 dòng `DELETE FROM
+task_comments` riêng (do chính SQLAlchemy tự load rồi tự xoá từng
+comment), **có lúc lại không** (do ORM để mặc cho DB tự cascade) — cho
+**cùng 1 đoạn code**, chỉ khác nhau ở việc `comments` có "tình cờ" đã
+được load vào session hay chưa lúc đó. Tự tay lặp lại 3 lần liên tiếp,
+thấy kết quả không giống nhau lần nào — bằng chứng rõ ràng đây là hành
+vi không xác định (non-deterministic), không thể chấp nhận cho 1 hệ
+thống mà log cần đáng tin cậy.
+
+**Fix**: thêm `passive_deletes=True` vào `Task.comments`
+(`backend/app/models.py`) — báo cho SQLAlchemy "đừng tự load/tự xoá,
+luôn để Postgres tự cascade qua ràng buộc khoá ngoại". Sau fix, lặp lại
+test 3 lần liên tiếp: **luôn luôn** chỉ đúng 1 dòng `DELETE FROM tasks`,
+không bao giờ có dòng `task_comments` — khớp đúng với mục 3.4 (điểm mù
+CASCADE DELETE), và field `cascaded_comments_deleted` ở app log trở
+thành **nguồn duy nhất, luôn đáng tin cậy** để biết có bao nhiêu comment
+đã bị xoá theo, không còn phụ thuộc may rủi vào hành vi ORM.
+
 ## 3.3. "Log on Commit", không phải "Log on Request"
 
 Nguyên tắc: **chỉ ghi log `result=success` SAU KHI thao tác ghi DB đã
