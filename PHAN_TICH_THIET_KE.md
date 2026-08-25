@@ -124,7 +124,8 @@ lớp (frontend/proxy/backend/database).
 | FR9 | Cập nhật công việc | Chỉ chủ sở hữu được sửa; ghi log giá trị cũ/mới từng field thay đổi |
 | FR10 | Xoá công việc | Chỉ chủ sở hữu được xoá |
 | FR11 | Ghi log đầy đủ | Mọi hành động ở FR1–FR10 đều để lại log ở đúng layer tương ứng (xem LOGGING_MAP.md) |
-| FR12 | Gắn nhãn (category) & lọc công việc theo nhãn | Mỗi task có thể gắn 1 nhãn tự do (VD: `work`, `study`, `personal`); danh sách task lọc được theo nhãn. Bổ sung ở đợt nâng cấp — xem [`VAN_HANH_NANG_CAP.md`](VAN_HANH_NANG_CAP.md). |
+| FR12 | Gắn nhãn (category) & lọc công việc theo nhãn | Mỗi task có thể gắn 1 nhãn tự do (VD: `work`, `study`, `personal`); danh sách task lọc được theo nhãn. Bổ sung ở đợt nâng cấp 1 — xem [`VAN_HANH_NANG_CAP.md`](VAN_HANH_NANG_CAP.md). |
+| FR13 | Ghi chú (comment) cho công việc | Mỗi task có thể có nhiều ghi chú theo thời gian; chỉ chủ sở hữu task mới xem/thêm/xoá được ghi chú của task đó. Bổ sung ở đợt nâng cấp 2 — xem [`VAN_HANH_NANG_CAP.md`](VAN_HANH_NANG_CAP.md). |
 
 ### B4. Thiết kế cơ sở dữ liệu
 
@@ -133,6 +134,9 @@ lớp (frontend/proxy/backend/database).
 ```
 users (1) ──────< sessions   (1 user có nhiều session, mỗi session thuộc 1 user)
 users (1) ──────< tasks      (1 user có nhiều task, mỗi task thuộc 1 user)
+tasks (1) ──────< task_comments  (1 task có nhiều comment; ON DELETE CASCADE
+                                    — xoá task thì xoá theo comment, xem 3.2
+                                    trong VAN_HANH_NANG_CAP.md)
 users (0..1) ───< login_attempts  (liên kết lỏng qua "username" — vẫn ghi
                                     nhận cả lần thử với username không tồn tại,
                                     nên không đặt khoá ngoại cứng tới users.id)
@@ -183,6 +187,16 @@ users (0..1) ───< login_attempts  (liên kết lỏng qua "username" — v
 | success | boolean | |
 | created_at | timestamptz, indexed | Dùng để đếm số lần fail trong cửa sổ trượt 5 phút |
 
+**Bảng `task_comments`** (thêm ở đợt nâng cấp 2)
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| id | UUID (PK) | |
+| task_id | UUID (FK → tasks.id, `ON DELETE CASCADE`) | Xoá task thì xoá theo comment — quyết định thiết kế có chủ đích, giải thích đầy đủ ở `VAN_HANH_NANG_CAP.md` mục 3.2 |
+| user_id | UUID (FK → users.id) | Người viết ghi chú |
+| content | varchar(1000) | |
+| created_at | timestamptz | Không có `updated_at` — comment không hỗ trợ sửa, chỉ tạo/xoá |
+
 ### B5. Thiết kế kiến trúc triển khai
 
 4 container Docker riêng biệt, mỗi container 1 trách nhiệm, giao tiếp qua
@@ -208,6 +222,9 @@ users (0..1) ───< login_attempts  (liên kết lỏng qua "username" — v
 | GET | `/api/tasks/{id}` | Chi tiết 1 task (chỉ chủ sở hữu) | Cần session | 200 |
 | PUT | `/api/tasks/{id}` | Cập nhật task (chỉ chủ sở hữu) | Cần session | 200 |
 | DELETE | `/api/tasks/{id}` | Xoá task (chỉ chủ sở hữu) | Cần session | 204 |
+| POST | `/api/tasks/{id}/comments` | Thêm ghi chú cho task (chỉ chủ sở hữu) | Cần session | 201 |
+| GET | `/api/tasks/{id}/comments` | Danh sách ghi chú của task (chỉ chủ sở hữu) | Cần session | 200 |
+| DELETE | `/api/tasks/{id}/comments/{comment_id}` | Xoá 1 ghi chú (chỉ chủ sở hữu task) | Cần session | 204 |
 | GET | `/api/health` | Health check cho container | Không | 200 |
 
 Mã lỗi dùng chung: `400` (validation), `401` (chưa đăng nhập/session hết
@@ -223,7 +240,7 @@ trace).
 | Đăng ký | `register.html` | Form username/email/password |
 | Đăng nhập | `login.html` | Form username/password, redirect về trang chủ khi thành công |
 | Hồ sơ | `profile.html` | Xem/sửa hồ sơ của người đang đăng nhập |
-| Công việc | `tasks.html` | Danh sách task dạng bảng (đổi trạng thái inline), form tạo mới, xem chi tiết/xoá theo từng dòng |
+| Công việc | `tasks.html` | Danh sách task dạng bảng (đổi trạng thái inline), form tạo mới, xem chi tiết/xoá theo từng dòng; modal chi tiết có thêm khu vực ghi chú (xem/thêm/xoá comment) |
 
 Luồng điều hướng chính: `Register → Login → (Home / Profile / Tasks)`.
 Mọi trang sau Login đều gọi API với cookie session có sẵn trong trình

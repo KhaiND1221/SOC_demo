@@ -94,6 +94,8 @@ volume DB).
 | `GET /api/tasks`, `GET /api/tasks/{id}` | Xem danh sách/chi tiết công việc |
 | `PUT /api/tasks/{id}` | Cập nhật công việc |
 | `DELETE /api/tasks/{id}` | Xoá công việc |
+| `POST/GET /api/tasks/{id}/comments` | Thêm/xem ghi chú cho công việc |
+| `DELETE /api/tasks/{id}/comments/{comment_id}` | Xoá ghi chú |
 | `GET /api/debug/crash` | **Chỉ phục vụ demo/quay video** — cố tình gây lỗi 500 để minh hoạ kịch bản "phát sinh exception" (xem `KICH_BAN_DEMO.md` bước 2.6). Không phải chức năng nghiệp vụ thật. |
 
 Chi tiết thiết kế API/màn hình đầy đủ ở

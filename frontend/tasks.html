@@ -197,7 +197,10 @@
       }
     });
 
-    function openDetailModal(t) {
+    let currentModalTaskId = null;
+
+    async function openDetailModal(t) {
+      currentModalTaskId = t.id;
       document.getElementById("detail-title").textContent = t.title;
       document.getElementById("detail-body").innerHTML = `
         <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value" style="user-select:all;">${t.id}</span></div>
@@ -208,12 +211,78 @@
         <div class="detail-row"><span class="detail-label">Danh mục</span><span class="detail-value">${t.category || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Hạn chót</span><span class="detail-value">${t.due_date || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Tạo lúc</span><span class="detail-value">${new Date(t.created_at).toLocaleString("vi-VN")}</span></div>
-        <div class="detail-row"><span class="detail-label">Cập nhật lúc</span><span class="detail-value">${new Date(t.updated_at).toLocaleString("vi-VN")}</span></div>`;
+        <div class="detail-row"><span class="detail-label">Cập nhật lúc</span><span class="detail-value">${new Date(t.updated_at).toLocaleString("vi-VN")}</span></div>
+        <div class="detail-row" style="display:block; margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+          <h3 class="section-title">Ghi chú</h3>
+          <div id="comments-list" class="muted">Đang tải...</div>
+          <label for="new-comment-input">Thêm ghi chú mới</label>
+          <input id="new-comment-input" type="text" placeholder="VD: đã liên hệ khách hàng lúc 15h" />
+          <button id="add-comment-btn" class="secondary">Thêm ghi chú</button>
+          <p id="comment-msg" class="message"></p>
+        </div>`;
       document.getElementById("detail-modal").classList.remove("hidden");
+      loadComments(t.id);
     }
+
+    async function loadComments(taskId) {
+      const listEl = document.getElementById("comments-list");
+      const res = await apiFetch(`/tasks/${taskId}/comments`);
+
+      if (!res.ok) {
+        listEl.textContent = `Không tải được ghi chú (HTTP ${res.status}).`;
+        return;
+      }
+
+      if (res.data.length === 0) {
+        listEl.innerHTML = `<p class="muted">Chưa có ghi chú nào.</p>`;
+        return;
+      }
+
+      listEl.innerHTML = res.data
+        .map(
+          (c) => `
+        <div class="detail-row" style="align-items:flex-start;">
+          <span class="detail-value" style="flex:1;">
+            ${c.content}
+            <div class="muted" style="font-size:12px; margin-top:2px;">${new Date(c.created_at).toLocaleString("vi-VN")}</div>
+          </span>
+          <button class="danger" data-comment-id="${c.id}" style="margin-top:0; padding:4px 8px; font-size:12px;">Xoá</button>
+        </div>`
+        )
+        .join("");
+    }
+
+    document.getElementById("detail-body").addEventListener("click", async (e) => {
+      if (e.target.id === "add-comment-btn") {
+        const msgEl = document.getElementById("comment-msg");
+        const input = document.getElementById("new-comment-input");
+        const content = input.value.trim();
+        if (!content) { showMessage(msgEl, "Nhập nội dung ghi chú trước đã.", true); return; }
+
+        const res = await apiFetch(`/tasks/${currentModalTaskId}/comments`, {
+          method: "POST",
+          body: JSON.stringify({ content }),
+        });
+        if (res.ok) {
+          input.value = "";
+          showMessage(msgEl, "Đã thêm ghi chú.");
+          loadComments(currentModalTaskId);
+        } else {
+          showMessage(msgEl, `Error ${res.status}: ${JSON.stringify(res.data && res.data.detail)}`, true);
+        }
+        return;
+      }
+
+      const commentId = e.target.dataset && e.target.dataset.commentId;
+      if (commentId) {
+        await apiFetch(`/tasks/${currentModalTaskId}/comments/${commentId}`, { method: "DELETE" });
+        loadComments(currentModalTaskId);
+      }
+    });
 
     function closeDetailModal() {
       document.getElementById("detail-modal").classList.add("hidden");
+      currentModalTaskId = null;
     }
 
     document.getElementById("detail-close").addEventListener("click", closeDetailModal);

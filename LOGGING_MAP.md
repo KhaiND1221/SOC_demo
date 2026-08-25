@@ -62,8 +62,14 @@ ngoài bộ field chung đó.
 | Xem/sửa/xoá task của người khác (bị chặn) | `authorization_denied` | `logs/app/app.log` | Application | `resource=task, resource_id, owner_id, requester_id` | HTTP 403. Surface thứ 2 của cùng loại lỗi authorization, độc lập với profile. |
 | Cập nhật task (của chính mình) | `task_update` | `logs/app/app.log` | Application | `task_id, changed_fields` (mỗi field: `{old, new}`) | Ví dụ đổi `status` từ `todo` → `doing` sẽ log `changed_fields: {"status": {"old": "todo", "new": "doing"}}`. |
 | Cập nhật task | (UPDATE bảng `tasks`) | `logs/postgres/postgresql-*.log` | Database | `UPDATE tasks SET ...` | Đối chiếu field/giá trị mới với `changed_fields` ở app.log. |
-| Xoá task (của chính mình) | `task_delete` | `logs/app/app.log` | Application | `task_id` | — |
-| Xoá task | (DELETE bảng `tasks`) | `logs/postgres/postgresql-*.log` | Database | `DELETE FROM tasks WHERE id = ...` | — |
+| Xoá task (của chính mình) | `task_delete` | `logs/app/app.log` | Application | `task_id, cascaded_comments_deleted` | `cascaded_comments_deleted` đếm số comment bị xoá theo (cascade) — **bù cho điểm mù** của Postgres (xem ghi chú thiết kế #4 bên dưới). |
+| Xoá task | (DELETE bảng `tasks`) | `logs/postgres/postgresql-*.log` | Database | `DELETE FROM tasks WHERE id = ...` | Chỉ có đúng 1 dòng, dù task có comment con hay không — xem ghi chú #4. |
+| Thêm ghi chú (comment) cho task (của chính mình) | `comment_create` | `logs/app/app.log` | Application | `task_id, comment_id` | Log ghi SAU KHI `db.commit()` thành công ("log on commit"), không log ngay khi nhận request — xem `VAN_HANH_NANG_CAP.md` mục 3.3. |
+| Thêm comment | (INSERT bảng `task_comments`) | `logs/postgres/postgresql-*.log` | Database | `INSERT INTO task_comments ...` | — |
+| Xem danh sách comment của 1 task (của chính mình) | `comment_read` | `logs/app/app.log` | Application | `task_id, count` | Không có gì tương ứng ở Postgres log (SELECT không audit) — cùng nguyên tắc với `task_read`. |
+| Thêm/xem/xoá comment trên task của người khác (bị chặn) | `authorization_denied` | `logs/app/app.log` | Application | `resource=task, resource_id, owner_id, requester_id` | HTTP 403 — dùng chung hàm kiểm tra quyền sở hữu với task (`get_owned_task`), vì comment luôn đi kèm 1 task cụ thể. |
+| Xoá 1 comment (của chính mình) | `comment_delete` | `logs/app/app.log` | Application | `task_id, comment_id` | — |
+| Xoá comment | (DELETE bảng `task_comments`) | `logs/postgres/postgresql-*.log` | Database | `DELETE FROM task_comments WHERE id = ...` | Đây là DELETE do client gọi trực tiếp (không phải cascade) nên CÓ xuất hiện — khác với trường hợp #4 bên dưới. |
 | Gửi request sai định dạng/thiếu field bắt buộc | `validation_error` | `logs/app/app.log` | Application | `path, errors` (chi tiết lỗi pydantic) | HTTP 400. Không có stack trace vì đây là lỗi input hợp lệ về mặt xử lý, không phải exception. |
 | Lỗi server ngoài dự kiến (bug thật trong code, không phải input sai) | `unhandled_exception` | `logs/app/app.log` | Application | `path, exception_type, stack_trace` | HTTP 500 trả về **chỉ** `{"detail": "...", "request_id": ...}` — KHÔNG có stack trace ra client. Stack trace đầy đủ chỉ nằm trong file/stdout server-side (xử lý ở `app/main.py::unhandled_exception_handler`, áp dụng cho mọi exception không được bắt riêng, không cần một endpoint riêng để gây ra). |
 | Bất kỳ hành động nào ở trên | tương ứng | `docker logs soclab-nginx` / `docker logs soclab-backend` / `docker logs soclab-db` | OS / Container | toàn bộ stdout của từng container | Tương đương "OS layer" — xem README mục 5. |
@@ -90,6 +96,21 @@ ngoài bộ field chung đó.
    chỉ tạo ra `LOGIN_FAIL` với `reason=account_locked`). `ACCOUNT_LOCKED` =
    tín hiệu "đã khoá", còn chuỗi `LOGIN_FAIL` liên tiếp trước đó = tín hiệu
    "đang bị brute-force".
+
+4. **CASCADE DELETE là điểm mù (blind spot) của log Postgres.** Khi xoá 1
+   task có comment con (`ON DELETE CASCADE` trên `task_comments.task_id`),
+   log Postgres **chỉ** có 1 dòng `DELETE FROM tasks ...` — **không có**
+   dòng `DELETE FROM task_comments` nào, dù comment con thực sự đã bị xoá.
+   Lý do: cascade là hành động **nội bộ** Postgres tự thực hiện để giữ
+   ràng buộc khoá ngoại, không phải câu lệnh SQL do client gửi lên, nên
+   `log_statement=mod` (chỉ ghi lại câu lệnh client gửi) không thấy được.
+   Đây là giới hạn thật của Postgres, không sửa được ở tầng DB — đã bù lại
+   bằng cách log tường minh `cascaded_comments_deleted` ở tầng Application
+   (xem dòng `task_delete` ở bảng trên, và giải thích đầy đủ ở
+   `VAN_HANH_NANG_CAP.md` mục 3.4). Bài học: khi phát hiện 1 layer có điểm
+   mù, phải chủ động bù bằng layer khác mình kiểm soát được — không được
+   để trống, vì mentor/SOC analyst hoàn toàn có thể hỏi thẳng "dữ liệu đó
+   biến mất đi đâu, ai xoá, xoá khi nào" và log phải trả lời được.
 
 ## Phụ lục: kịch bản thao tác để tự sinh ra các log trên
 

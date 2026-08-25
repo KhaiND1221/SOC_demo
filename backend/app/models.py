@@ -55,6 +55,25 @@ class Task(Base):
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     user = relationship("User", back_populates="tasks")
+    comments = relationship(
+        "TaskComment", back_populates="task", cascade="all, delete-orphan", order_by="TaskComment.created_at"
+    )
+
+
+class TaskComment(Base):
+    __tablename__ = "task_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # ON DELETE CASCADE is a deliberate design choice, not the default -
+    # see VAN_HANH_NANG_CAP.md "Task Comments" section for the reasoning
+    # (comments have no standalone value once their task is gone, unlike
+    # e.g. a payment/audit record tied to an order).
+    task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    content = Column(String(1000), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    task = relationship("Task", back_populates="comments")
 
 
 class LoginAttempt(Base):

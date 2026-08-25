@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session as DBSession
 from app.database import get_db
 from app.deps import get_current_user
 from app.logging_config import app_logger, log_event
-from app.models import Task, User
+from app.models import Task, TaskComment, User
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
-def _get_owned_task(task_id: UUID, current_user: User, db: DBSession) -> Task:
+def get_owned_task(task_id: UUID, current_user: User, db: DBSession) -> Task:
     task = db.get(Task, task_id)
 
     if task is None:
@@ -94,7 +94,7 @@ def get_task(
     current_user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db),
 ):
-    task = _get_owned_task(task_id, current_user, db)
+    task = get_owned_task(task_id, current_user, db)
 
     log_event(
         app_logger,
@@ -116,7 +116,7 @@ def update_task(
     current_user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db),
 ):
-    task = _get_owned_task(task_id, current_user, db)
+    task = get_owned_task(task_id, current_user, db)
 
     changed_fields = {}
     updates = payload.model_dump(exclude_unset=True)
@@ -150,7 +150,15 @@ def delete_task(
     current_user: User = Depends(get_current_user),
     db: DBSession = Depends(get_db),
 ):
-    task = _get_owned_task(task_id, current_user, db)
+    task = get_owned_task(task_id, current_user, db)
+
+    # Postgres' log_statement='mod' only records statements a client
+    # actually issues - it does NOT log rows removed by an ON DELETE
+    # CASCADE foreign key (see task_comments.task_id in models.py). That
+    # cascade effect would otherwise be invisible to log analysis, so the
+    # count is captured here (before the delete) and logged explicitly -
+    # the application layer is what closes this gap, not the DB layer.
+    deleted_comments_count = db.query(TaskComment).filter(TaskComment.task_id == task.id).count()
 
     db.delete(task)
     db.commit()
@@ -163,4 +171,5 @@ def delete_task(
         message="Task deleted",
         user_id=str(current_user.id),
         task_id=str(task_id),
+        cascaded_comments_deleted=deleted_comments_count,
     )
